@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+
+{% block title %}Book Service - AgriFish{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map {
+        height: 300px;
+        width: 100%;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-calendar-plus me-2"></i>Book Spray Service</h4>
+                </div>
+                <div class="card-body">
+                    {% if detection %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Booking service for <strong>{{ detection.disease_detected }}</strong> 
+                        detected in your {{ detection.crop_type }} crop.
+                    </div>
+                    {% endif %}
+                    
+                    <form method="post" id="bookingForm">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Crop Type</label>
+                                    {{ form.crop_type }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Area (Acres)</label>
+                                    {{ form.area_acres }}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Preferred Date & Time</label>
+                            {{ form.preferred_date }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Farm Location</label>
+                            <div id="map"></div>
+                            {{ form.farm_latitude }}
+                            {{ form.farm_longitude }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Farm Address</label>
+                            {{ form.farm_address }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Additional Notes</label>
+                            {{ form.notes }}
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-calendar-check me-2"></i>Create Booking
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-calculator me-2"></i>Cost Estimate</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <h3 class="text-primary" id="estimatedCost">₹0</h3>
+                        <p class="text-muted">Estimated Cost</p>
+                    </div>
+                    <hr>
+                    <small class="text-muted">
+                        * Final cost may vary based on actual requirements
+                        * Includes equipment, chemicals, and labor
+                        * Payment after service completion
+                    </small>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6><i class="fas fa-users me-2"></i>Available Workers</h6>
+                </div>
+                <div class="card-body" id="nearbyWorkers">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Finding nearby workers...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap" async defer></script>
+<script>
+let map;
+let marker;
+
+function initMap() {
+    // Default location (can be user's location)
+    const defaultLat = {{ farmer_profile.latitude|default:"28.6139" }};
+    const defaultLng = {{ farmer_profile.longitude|default:"77.2090" }};
+    
+    map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 15,
+        center: { lat: defaultLat, lng: defaultLng }
+    });
+    
+    marker = new google.maps.Marker({
+        position: { lat: defaultLat, lng: defaultLng },
+        map: map,
+        draggable: true,
+        title: 'Farm Location'
+    });
+    
+    // Update hidden fields
+    document.getElementById('id_farm_latitude').value = defaultLat;
+    document.getElementById('id_farm_longitude').value = defaultLng;
+    
+    // Marker drag event
+    marker.addListener('dragend', function() {
+        const position = marker.getPosition();
+        document.getElementById('id_farm_latitude').value = position.lat();
+        document.getElementById('id_farm_longitude').value = position.lng();
+        updateNearbyWorkers();
+        updateCostEstimate();
+    });
+    
+    // Load nearby workers
+    updateNearbyWorkers();
+}
+
+function updateNearbyWorkers() {
+    const lat = document.getElementById('id_farm_latitude').value;
+    const lng = document.getElementById('id_farm_longitude').value;
+    
+    fetch(`/api/nearby-workers/?lat=${lat}&lng=${lng}`)
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('nearbyWorkers');
+            
+            if (data.workers.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                        <p>No workers available in your area</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            data.workers.slice(0, 3).forEach(worker => {
+                html += `
+                    <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                        <div>
+                            <h6 class="mb-0">${worker.name}</h6>
+                            <small class="text-muted">
+                                ${worker.distance} km away • ₹${worker.hourly_rate}/hr
+                            </small>
+                            <div>
+                                ${generateStars(worker.rating)} (${worker.total_jobs} jobs)
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading workers:', error);
+        });
+}
+
+function generateStars(rating) {
+    let stars = '';
+    for (let i = 1; i <= 5; i++) {
+        if (i <= rating) {
+            stars += '<i class="fas fa-star text-warning"></i>';
+        } else {
+            stars += '<i class="far fa-star text-warning"></i>';
+        }
+    }
+    return stars;
+}
+
+function updateCostEstimate() {
+    const cropType = document.getElementById('id_crop_type').value;
+    const area = parseFloat(document.getElementById('id_area_acres').value) || 0;
+    
+    // Base rates per crop type
+    const rates = {
+        'tomato': 500,
+        'potato': 450,
+        'corn': 400,
+        'wheat': 350,
+        'rice': 400,
+        'cotton': 450,
+        'soybean': 400,
+        'apple': 550,
+        'grape': 600,
+        'other': 400
+    };
+    
+    const baseRate = rates[cropType] || 400;
+    const estimate = baseRate * area;
+    
+    document.getElementById('estimatedCost').textContent = `₹${estimate.toLocaleString()}`;
+}
+
+// Update cost when inputs change
+document.getElementById('id_crop_type').addEventListener('change', updateCostEstimate);
+document.getElementById('id_area_acres').addEventListener('input', updateCostEstimate);
+
+// Initialize cost estimate
+document.addEventListener('DOMContentLoaded', function() {
+    updateCostEstimate();
+});
+</script>
+{% endblock %}

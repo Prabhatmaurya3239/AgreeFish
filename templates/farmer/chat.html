@@ -1,0 +1,630 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Assistant - AgriFish{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        height: 70vh;
+        border: 1px solid #e9ecef;
+        border-radius: 15px;
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    }
+    
+    .chat-header {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        padding: 20px;
+        border-radius: 15px 15px 0 0;
+        text-align: center;
+    }
+    
+    .chat-messages {
+        height: 50vh;
+        overflow-y: auto;
+        padding: 20px;
+        background: white;
+    }
+    
+    .message {
+        margin-bottom: 15px;
+        display: flex;
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    .message.user {
+        justify-content: flex-end;
+    }
+    
+    .message-content {
+        max-width: 70%;
+        padding: 12px 16px;
+        border-radius: 18px;
+        position: relative;
+    }
+    
+    .message.user .message-content {
+        background: #28a745;
+        color: white;
+        border-bottom-right-radius: 5px;
+    }
+    
+    .message.ai .message-content {
+        background: #f1f3f5;
+        color: #333;
+        border-bottom-left-radius: 5px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .message-time {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        margin-top: 5px;
+    }
+    
+    .typing-indicator {
+        display: none;
+        padding: 10px 16px;
+        background: #f1f3f5;
+        border-radius: 18px;
+        border-bottom-left-radius: 5px;
+        max-width: 70px;
+    }
+    
+    .typing-dots {
+        display: flex;
+        gap: 3px;
+    }
+    
+    .typing-dots span {
+        width: 8px;
+        height: 8px;
+        background: #666;
+        border-radius: 50%;
+        animation: typing 1.4s infinite ease-in-out;
+    }
+    
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    
+    @keyframes typing {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-10px); }
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .chat-input {
+        padding: 20px;
+        border-top: 1px solid #e9ecef;
+        background: white;
+        border-radius: 0 0 15px 15px;
+    }
+    
+    .voice-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 10px;
+    }
+    
+    .voice-btn {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        border: none;
+        background: #28a745;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+    
+    .voice-btn:hover {
+        background: #218838;
+        transform: scale(1.1);
+    }
+    
+    .voice-btn.recording {
+        background: #dc3545;
+        animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+    }
+    
+    .quick-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 15px;
+    }
+    
+    .quick-action-btn {
+        background: rgba(40, 167, 69, 0.1);
+        border: 1px solid #28a745;
+        color: #28a745;
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .quick-action-btn:hover {
+        background: #28a745;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="chat-container">
+                <!-- Chat Header -->
+                <div class="chat-header">
+                    <h4><i class="fas fa-robot me-2"></i>AgriFish AI Assistant</h4>
+                    <p class="mb-0">Ask me anything about farming, crop diseases, or agricultural practices</p>
+                </div>
+                
+                <!-- Chat Messages -->
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Welcome Message -->
+                    <div class="message ai">
+                        <div class="message-content">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-robot text-success me-2 mt-1"></i>
+                                <div>
+                                    <div>
+                                        {% if user_language == 'hi' %}
+                                            नमस्ते! मैं AgriFish AI सहायक हूँ। मैं आपकी खेती, फसल रोग, और कृषि प्रथाओं में मदद कर सकता हूँ। आप मुझसे कुछ भी पूछ सकते हैं!
+                                        {% elif user_language == 'te' %}
+                                            నమస్కారం! నేను AgriFish AI అసిస్టెంట్. వ్యవసాయం, పంట వ్యాధులు, మరియు వ్యవసాయ పద్ధతుల గురించి నేను మీకు సహాయం చేయగలను!
+                                        {% elif user_language == 'ta' %}
+                                            வணக்கம்! நான் AgriFish AI உதவியாளர். விவசாயம், பயிர் நோய்கள், மற்றும் விவசாய முறைகளில் நான் உங்களுக்கு உதவ முடியும்!
+                                        {% else %}
+                                            Hello! I'm your AgriFish AI Assistant. I can help you with farming, crop diseases, and agricultural practices. Feel free to ask me anything!
+                                        {% endif %}
+                                    </div>
+                                    <div class="message-time">Just now</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Typing indicator -->
+                    <div class="message ai" id="typingIndicator">
+                        <div class="typing-indicator">
+                            <i class="fas fa-robot text-success me-2"></i>
+                            <div class="typing-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chat Input -->
+                <div class="chat-input">
+                    <!-- Quick Actions -->
+                    <div class="quick-actions">
+                        <button class="quick-action-btn" onclick="sendQuickMessage('What diseases affect tomato crops?')">
+                            <i class="fas fa-bug me-1"></i>Tomato Diseases
+                        </button>
+                        <button class="quick-action-btn" onclick="sendQuickMessage('Best time to plant wheat?')">
+                            <i class="fas fa-calendar me-1"></i>Planting Time
+                        </button>
+                        <button class="quick-action-btn" onclick="sendQuickMessage('Organic fertilizer recommendations')">
+                            <i class="fas fa-leaf me-1"></i>Fertilizers
+                        </button>
+                        <button class="quick-action-btn" onclick="sendQuickMessage('How to prevent crop diseases?')">
+                            <i class="fas fa-shield-alt me-1"></i>Prevention
+                        </button>
+                        <button class="quick-action-btn" onclick="sendQuickMessage('Weather impact on crops')">
+                            <i class="fas fa-cloud-sun me-1"></i>Weather
+                        </button>
+                    </div>
+                    
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="messageInput" 
+                               placeholder="{% if user_language == 'hi' %}अपना सवाल यहाँ लिखें...{% elif user_language == 'te' %}మీ ప్రశ్నను ఇక్కడ టైప్ చేయండి...{% elif user_language == 'ta' %}உங்கள் கேள்வியை இங்கே தட்டச்சு செய்யுங்கள்...{% else %}Type your question here...{% endif %}" 
+                               maxlength="500">
+                        <button class="btn btn-success" type="button" id="sendButton" onclick="sendMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Voice Controls -->
+                    <div class="voice-controls">
+                        <button class="voice-btn" id="voiceBtn" onclick="toggleVoiceRecording()" title="Voice Input">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        <button class="voice-btn" onclick="speakLastMessage()" title="Read Last Message">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                        <small class="text-muted ms-2">
+                            {% if user_language == 'hi' %}
+                                आवाज में बोलें या टाइप करें
+                            {% elif user_language == 'te' %}
+                                మాట్లాడండి లేదా టైప్ చేయండి
+                            {% elif user_language == 'ta' %}
+                                பேசுங்கள் அல்லது தட்டச்சு செய்யுங்கள்
+                            {% else %}
+                                Speak or type your question
+                            {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Voice Recognition and Chat JavaScript -->
+<script>
+let recognition;
+let isRecording = false;
+let lastAIResponse = '';
+let chatHistory = [];
+
+// Initialize Speech Recognition
+if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = getLanguageCode('{{ user_language }}');
+    
+    recognition.onstart = function() {
+        isRecording = true;
+        document.getElementById('voiceBtn').classList.add('recording');
+        document.querySelector('#voiceBtn i').className = 'fas fa-stop';
+    };
+    
+    recognition.onend = function() {
+        isRecording = false;
+        document.getElementById('voiceBtn').classList.remove('recording');
+        document.querySelector('#voiceBtn i').className = 'fas fa-microphone';
+    };
+    
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('messageInput').value = transcript;
+        sendMessage();
+    };
+    
+    recognition.onerror = function(event) {
+        console.error('Speech recognition error:', event.error);
+        showToast('Voice recognition error. Please try again.', 'error');
+    };
+}
+
+function getLanguageCode(lang) {
+    const langMap = {
+        'hi': 'hi-IN',
+        'te': 'te-IN',
+        'ta': 'ta-IN',
+        'en': 'en-US'
+    };
+    return langMap[lang] || 'en-US';
+}
+
+function toggleVoiceRecording() {
+    if (!recognition) {
+        showToast('Voice recognition not supported in this browser.', 'error');
+        return;
+    }
+    
+    if (isRecording) {
+        recognition.stop();
+    } else {
+        recognition.start();
+    }
+}
+
+function sendMessage() {
+    const messageInput = document.getElementById('messageInput');
+    const message = messageInput.value.trim();
+    
+    if (!message) return;
+    
+    // Add user message to chat
+    addMessageToChat(message, 'user');
+    
+    // Clear input and show typing indicator
+    messageInput.value = '';
+    showTypingIndicator();
+    
+    // Store message in history
+    chatHistory.push({type: 'user', message: message, timestamp: new Date()});
+    
+    // Send to AI
+    fetch('/api/chat/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            message: message,
+            context: getContextFromHistory(),
+            language: '{{ user_language }}'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideTypingIndicator();
+        
+        if (data.success) {
+            addMessageToChat(data.response, 'ai');
+            lastAIResponse = data.response;
+            
+            // Store AI response in history
+            chatHistory.push({
+                type: 'ai', 
+                message: data.response, 
+                timestamp: new Date()
+            });
+            
+            // Auto-speak AI response if enabled
+            if (shouldAutoSpeak()) {
+                setTimeout(() => speakText(data.response), 500);
+            }
+        } else {
+            addMessageToChat('Sorry, I encountered an error. Please try again.', 'ai');
+        }
+    })
+    .catch(error => {
+        hideTypingIndicator();
+        console.error('Chat error:', error);
+        addMessageToChat('Connection error. Please check your internet and try again.', 'ai');
+    });
+}
+
+function sendQuickMessage(message) {
+    document.getElementById('messageInput').value = message;
+    sendMessage();
+}
+
+function addMessageToChat(message, sender) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}`;
+    
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour12: true, 
+        hour: 'numeric', 
+        minute: '2-digit' 
+    });
+    
+    const icon = sender === 'ai' ? '<i class="fas fa-robot text-success me-2 mt-1"></i>' : '';
+    
+    messageDiv.innerHTML = `
+        <div class="message-content">
+            <div class="d-flex align-items-start">
+                ${icon}
+                <div>
+                    <div>${formatMessage(message)}</div>
+                    <div class="message-time">${timeString}</div>
+                </div>
+                ${sender === 'ai' ? `
+                <div class="ms-2">
+                    <button class="btn btn-sm btn-outline-success" onclick="speakText('${message.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    
+    // Remove typing indicator if present
+    const typingIndicator = document.getElementById('typingIndicator');
+    if (typingIndicator.style.display !== 'none') {
+        typingIndicator.style.display = 'none';
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function formatMessage(message) {
+    // Convert markdown-like formatting to HTML
+    return message
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+}
+
+function showTypingIndicator() {
+    const typingIndicator = document.getElementById('typingIndicator');
+    const typingDots = typingIndicator.querySelector('.typing-indicator');
+    typingIndicator.style.display = 'flex';
+    typingDots.style.display = 'flex';
+    
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function hideTypingIndicator() {
+    const typingIndicator = document.getElementById('typingIndicator');
+    typingIndicator.style.display = 'none';
+}
+
+function speakText(text) {
+    if ('speechSynthesis' in window) {
+        // Stop any ongoing speech
+        speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = getLanguageCode('{{ user_language }}');
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        
+        speechSynthesis.speak(utterance);
+    } else {
+        // Fallback to server-generated audio
+        fetch('/api/voice/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: `text=${encodeURIComponent(text)}&language={{ user_language }}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.audio_url) {
+                const audio = new Audio(data.audio_url);
+                audio.play();
+            }
+        })
+        .catch(error => console.error('TTS error:', error));
+    }
+}
+
+function speakLastMessage() {
+    if (lastAIResponse) {
+        speakText(lastAIResponse);
+    } else {
+        showToast('No AI message to read.', 'info');
+    }
+}
+
+function shouldAutoSpeak() {
+    // Check user preference (could be stored in localStorage or user settings)
+    return localStorage.getItem('autoSpeak') === 'true';
+}
+
+function getContextFromHistory() {
+    // Get last 3 messages for context
+    const recentHistory = chatHistory.slice(-6); // 3 user + 3 AI messages
+    return recentHistory.map(h => `${h.type}: ${h.message}`).join('\n');
+}
+
+// Enter key to send message
+document.getElementById('messageInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+// Utility functions
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 300px;';
+    toast.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close ms-2" onclick="this.parentElement.remove()"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.remove(), 5000);
+}
+
+// Initialize chat on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-focus input
+    document.getElementById('messageInput').focus();
+    
+    // Load chat history from localStorage if available
+    const savedHistory = localStorage.getItem('agriFishChatHistory');
+    if (savedHistory) {
+        try {
+            const history = JSON.parse(savedHistory);
+            history.forEach(h => {
+                if (h.type !== 'ai' || h.message !== lastAIResponse) { // Don't duplicate welcome message
+                    addMessageToChat(h.message, h.type);
+                }
+            });
+            chatHistory = history;
+        } catch (e) {
+            console.error('Error loading chat history:', e);
+        }
+    }
+    
+    // Save chat history periodically
+    setInterval(function() {
+        localStorage.setItem('agriFishChatHistory', JSON.stringify(chatHistory));
+    }, 30000); // Save every 30 seconds
+});
+
+// Clear chat function
+function clearChat() {
+    if (confirm('Clear all chat history?')) {
+        document.getElementById('chatMessages').innerHTML = `
+            <div class="message ai">
+                <div class="message-content">
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-robot text-success me-2 mt-1"></i>
+                        <div>
+                            <div>Chat cleared! How can I help you today?</div>
+                            <div class="message-time">Just now</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        chatHistory = [];
+        localStorage.removeItem('agriFishChatHistory');
+    }
+}
+</script>
+
+<!-- Add to navbar or as floating button -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1000;">
+    <button class="btn btn-success btn-sm" onclick="clearChat()" title="Clear Chat">
+        <i class="fas fa-trash"></i>
+    </button>
+    <button class="btn btn-info btn-sm ms-2" onclick="toggleAutoSpeak()" title="Toggle Auto-speak" id="autoSpeakBtn">
+        <i class="fas fa-volume-up"></i>
+    </button>
+</div>
+
+<script>
+function toggleAutoSpeak() {
+    const current = localStorage.getItem('autoSpeak') === 'true';
+    localStorage.setItem('autoSpeak', !current);
+    const btn = document.getElementById('autoSpeakBtn');
+    btn.className = `btn btn-${!current ? 'success' : 'info'} btn-sm ms-2`;
+    showToast(`Auto-speak ${!current ? 'enabled' : 'disabled'}`, 'success');
+}
+
+// Initialize auto-speak button state
+document.addEventListener('DOMContentLoaded', function() {
+    const autoSpeak = localStorage.getItem('autoSpeak') === 'true';
+    const btn = document.getElementById('autoSpeakBtn');
+    if (btn) {
+        btn.className = `btn btn-${autoSpeak ? 'success' : 'info'} btn-sm ms-2`;
+    }
+});
+</script>
+
+{% endblock %}

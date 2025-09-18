@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+
+{% block title %}Payment - AgriFish{% endblock %}
+
+{% block extra_css %}
+<style>
+    .payment-card {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+    }
+    .booking-summary {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+    }
+    .payment-method {
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .payment-method:hover,
+    .payment-method.active {
+        border-color: #28a745;
+        background-color: #e8f5e9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <!-- Booking Summary -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-receipt me-2"></i>Booking Summary</h4>
+                </div>
+                <div class="card-body">
+                    <div class="booking-summary">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Service Details</h6>
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <td>Service Type:</td>
+                                        <td><strong>{{ booking.service_type }}</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Crop Type:</td>
+                                        <td>{{ booking.crop_type|title }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Area:</td>
+                                        <td>{{ booking.area_acres }} acres</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Preferred Date:</td>
+                                        <td>{{ booking.preferred_date|date:"M d, Y H:i" }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Farm Location</h6>
+                                <p class="text-muted">{{ booking.farm_address|truncatechars:100 }}</p>
+                                
+                                {% if booking.disease_detection %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-bug me-2"></i>
+                                    <strong>Disease Treatment:</strong> {{ booking.disease_detection.disease_detected }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Methods -->
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-credit-card me-2"></i>Payment Method</h4>
+                </div>
+                <div class="card-body">
+                    <form id="paymentForm">
+                        {% csrf_token %}
+                        
+                        <!-- Payment Options -->
+                        <div class="payment-method active" data-method="razorpay">
+                            <div class="d-flex align-items-center">
+                                <input type="radio" name="payment_method" value="razorpay" checked class="me-3">
+                                <div class="flex-grow-1">
+                                    <h6><i class="fas fa-mobile-alt me-2"></i>UPI / Cards / Wallets</h6>
+                                    <small class="text-muted">Pay using UPI, Debit/Credit Cards, Net Banking, Wallets</small>
+                                </div>
+                                <img src="https://razorpay.com/assets/razorpay-logo.svg" alt="Razorpay" height="30">
+                            </div>
+                        </div>
+
+                        <div class="payment-method" data-method="cod">
+                            <div class="d-flex align-items-center">
+                                <input type="radio" name="payment_method" value="cod" class="me-3">
+                                <div class="flex-grow-1">
+                                    <h6><i class="fas fa-hand-holding-usd me-2"></i>Cash on Service</h6>
+                                    <small class="text-muted">Pay in cash after service completion</small>
+                                </div>
+                                <span class="badge bg-success">Available</span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Payment Summary -->
+            <div class="payment-card mt-4">
+                {% load math_extras %}
+
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-calculator me-2"></i>Payment Summary</h5>
+                        <div class="d-flex justify-content-between">
+                            <span>Service Charge:</span>
+                            <span>₹{{ booking.estimated_cost }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Platform Fee:</span>
+                            <span>₹0</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Taxes (GST):</span>
+                            <span>₹0</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <strong>Total Amount:</strong>
+                            <strong>₹{{ booking.estimated_cost }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-center">
+                        <h2>₹{{ booking.estimated_cost }}</h2>
+                        <p class="mb-0">Total Amount</p>
+                        
+                        <div class="mt-4">
+                            <button type="button" class="btn btn-light btn-lg" id="proceedPayment">
+                                <i class="fas fa-lock me-2"></i>Proceed to Pay
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Info -->
+            <div class="text-center mt-3">
+                <small class="text-muted">
+                    <i class="fas fa-shield-alt me-1"></i>
+                    Your payment information is secure and encrypted
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Razorpay Script -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Payment method selection
+    document.querySelectorAll('.payment-method').forEach(method => {
+        method.addEventListener('click', function() {
+            document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('active'));
+            this.classList.add('active');
+            this.querySelector('input[type="radio"]').checked = true;
+        });
+    });
+
+    // Proceed to payment
+    document.getElementById('proceedPayment').addEventListener('click', function() {
+        const selectedMethod = document.querySelector('input[name="payment_method"]:checked').value;
+        
+        if (selectedMethod === 'cod') {
+            // Handle cash on delivery
+            if (confirm('Confirm cash payment after service completion?')) {
+                // Update booking status and redirect
+                window.location.href = "{% url 'farmer_dashboard' %}";
+            }
+        } else if (selectedMethod === 'razorpay') {
+            // Initialize Razorpay payment
+            alert("Initiating Razorpay payment...");
+            const options = {
+                "key": "{{ razorpay_key_id }}",
+                "amount": {{ booking.estimated_cost }},
+                "currency": "INR",
+                "name": "AgriFish",
+                "description": "{{ booking.service_type }} - {{ booking.crop_type }}",
+                "order_id": "{{ order.id }}",
+                "handler": function (response){
+                    // Handle successful payment
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = "{% url 'payment_success' %}";
+                    
+                    const fields = ['razorpay_payment_id', 'razorpay_order_id', 'razorpay_signature'];
+                    fields.forEach(field => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = field;
+                        input.value = response[field];
+                        form.appendChild(input);
+                    });
+                    
+                    const csrf = document.createElement('input');
+                    csrf.type = 'hidden';
+                    csrf.name = 'csrfmiddlewaretoken';
+                    csrf.value = '{{ csrf_token }}';
+                    form.appendChild(csrf);
+                    
+                    document.body.appendChild(form);
+                    form.submit();
+                },
+                "prefill": {
+                    "name": "{{ user.get_full_name }}",
+                    "email": "{{ user.email }}",
+                    "contact": "{{ user.userprofile.phone }}"
+                },
+                "theme": {
+                    "color": "#28a745"
+                }
+            };
+            
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+    });
+});
+</script>
+{% endblock %}

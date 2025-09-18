@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold mb-4">Welcome to AgriFish</h1>
+                <p class="lead mb-4">Smart Agriculture Platform connecting farmers with AI-powered disease detection and professional spray services</p>
+                <div class="d-flex gap-3">
+                    <a href="{% url 'register_farmer' %}" class="btn btn-light btn-lg">
+                        <i class="fas fa-user-plus me-2"></i>Join as Farmer
+                    </a>
+                    <a href="{% url 'register_worker' %}" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-tools me-2"></i>Join as Service Provider
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <img src="https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=600" alt="Agriculture" class="img-fluid rounded shadow">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row text-center mb-5">
+        <div class="col">
+            <h2 class="display-5 fw-bold text-primary">Why Choose AgriFish?</h2>
+            <p class="lead">Advanced technology meets traditional farming</p>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="text-center">
+                <div class="feature-icon">
+                    <i class="fas fa-microscope"></i>
+                </div>
+                <h4>AI Disease Detection</h4>
+                <p>Upload crop images and get instant disease identification with treatment recommendations in your local language.</p>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="text-center">
+                <div class="feature-icon">
+                    <i class="fas fa-map-marker-alt"></i>
+                </div>
+                <h4>Location-Based Services</h4>
+                <p>Find and book nearby agricultural service providers with real-time tracking and transparent pricing.</p>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="text-center">
+                <div class="feature-icon">
+                    <i class="fas fa-language"></i>
+                </div>
+                <h4>Multi-Language Support</h4>
+                <p>Access all features in Hindi, Telugu, Tamil, and English with voice assistance for easy understanding.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-5">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="fas fa-user me-2"></i>For Farmers</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success me-2"></i>Disease detection with AI</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Treatment suggestions</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Book spray services</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Track service progress</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Secure online payments</li>
+                    </ul>
+                    <a href="{% url 'register_farmer' %}" class="btn btn-primary">Get Started</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="fas fa-tools me-2"></i>For Service Providers</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success me-2"></i>Receive nearby job requests</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Manage availability</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Track earnings</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Build customer ratings</li>
+                        <li><i class="fas fa-check text-success me-2"></i>Instant payments</li>
+                    </ul>
+                    <a href="{% url 'register_worker' %}" class="btn btn-primary">Join Now</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

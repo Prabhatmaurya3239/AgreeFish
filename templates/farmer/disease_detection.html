@@ -1,0 +1,485 @@
+{% extends 'base.html' %}
+
+{% block title %}Disease Detection - AgriFish{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-area {
+        border: 3px dashed #28a745;
+        border-radius: 15px;
+        padding: 60px 20px;
+        text-align: center;
+        transition: all 0.3s ease;
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        cursor: pointer;
+    }
+    
+    .upload-area:hover {
+        border-color: #20c997;
+        background: linear-gradient(135deg, #e8f5e9, #d4edda);
+        transform: translateY(-2px);
+    }
+    
+    .upload-area.dragover {
+        border-color: #17a2b8;
+        background: linear-gradient(135deg, #e1f7fe, #b3e5fc);
+    }
+    
+    .upload-icon {
+        font-size: 4rem;
+        color: #28a745;
+        margin-bottom: 1rem;
+    }
+    
+    .camera-btn {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        border: none;
+        color: white;
+        padding: 15px 30px;
+        border-radius: 50px;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .camera-btn:hover {
+        background: linear-gradient(135deg, #20c997, #17a2b8);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    
+    .progress-container {
+        display: none;
+        margin-top: 20px;
+    }
+    
+    .analysis-progress {
+        height: 25px;
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    
+    .preview-container {
+        display: none;
+        margin-top: 20px;
+    }
+    
+    .image-preview {
+        max-width: 100%;
+        max-height: 300px;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    
+    .recent-scans {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .scan-item {
+        border-left: 4px solid #28a745;
+        transition: all 0.3s ease;
+    }
+    
+    .scan-item:hover {
+        background-color: #f8f9fa;
+        transform: translateX(5px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Main Detection Card -->
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-microscope me-2"></i>AI Disease Detection
+                    </h4>
+                    <p class="mb-0 opacity-75">Upload crop image for instant AI analysis</p>
+                </div>
+                
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="diseaseDetectionForm">
+                        {% csrf_token %}
+                        
+                        <!-- Crop Selection -->
+                        <div class="mb-4">
+                            <label class="form-label h5">Select Crop Type</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.crop_type }}
+                                </div>
+                                <div class="col-md-6">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Choose the closest match for better accuracy
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Image Upload Area -->
+                        <div class="mb-4">
+                            <label class="form-label h5">Upload Crop Image</label>
+                            <div class="upload-area" id="uploadArea">
+                                <div class="upload-icon">
+                                    <i class="fas fa-camera-retro"></i>
+                                </div>
+                                <h5 class="mb-3">Drag & Drop or Click to Upload</h5>
+                                <p class="text-muted mb-4">Supported: JPG, PNG, JPEG • Max size: 5MB</p>
+                                
+                                <div class="d-flex gap-3 justify-content-center flex-wrap">
+                                    <button type="button" class="camera-btn" onclick="document.getElementById('id_crop_image').click()">
+                                        <i class="fas fa-upload me-2"></i>Choose File
+                                    </button>
+                                    <button type="button" class="camera-btn" onclick="openCamera()">
+                                        <i class="fas fa-camera me-2"></i>Take Photo
+                                    </button>
+                                </div>
+                                
+                                {{ form.crop_image }}
+                            </div>
+                            
+                            <!-- Image Preview -->
+                            <div class="preview-container" id="previewContainer">
+                                <div class="text-center">
+                                    <img id="imagePreview" class="image-preview" alt="Image Preview">
+                                    <div class="mt-3">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="removeImage()">
+                                            <i class="fas fa-times me-1"></i>Remove
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="document.getElementById('id_crop_image').click()">
+                                            <i class="fas fa-sync me-1"></i>Change
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Progress Bar -->
+                            <div class="progress-container" id="progressContainer">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold">Analyzing Image...</span>
+                                    <span id="progressText">0%</span>
+                                </div>
+                                <div class="progress analysis-progress">
+                                    <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" 
+                                         id="progressBar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <div class="text-center mt-3">
+                                    <small class="text-muted" id="statusText">Initializing AI analysis...</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success btn-lg" id="analyzeBtn" disabled>
+                                <i class="fas fa-brain me-2"></i>Analyze with AI
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Tips Card -->
+            <div class="card mt-4 border-info">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="fas fa-lightbulb me-2"></i>Photography Tips</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-success">✅ Do:</h6>
+                            <ul class="small">
+                                <li>Take photos in natural daylight</li>
+                                <li>Focus on affected plant parts</li>
+                                <li>Keep camera steady and close</li>
+                                <li>Include multiple affected areas</li>
+                                <li>Use clean, dry leaves when possible</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-danger">❌ Avoid:</h6>
+                            <ul class="small">
+                                <li>Blurry or shaky images</li>
+                                <li>Photos in dim lighting</li>
+                                <li>Images with too much background</li>
+                                <li>Extremely close-up shots</li>
+                                <li>Photos of healthy-looking plants only</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Recent Scans -->
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-history me-2"></i>Recent Scans ({{ recent_detections|length }})</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="recent-scans">
+                        {% if recent_detections %}
+                            {% for detection in recent_detections %}
+                                <div class="scan-item p-3 border-bottom">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ detection.crop_type|title }}</h6>
+                                            <small class="text-muted">
+                                                {% if detection.disease_detected %}
+                                                    <span class="text-warning">{{ detection.disease_detected }}</span>
+                                                {% else %}
+                                                    <span class="text-success">Healthy</span>
+                                                {% endif %}
+                                            </small>
+                                            <div class="small text-muted mt-1">
+                                                {{ detection.detected_at|timesince }} ago
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <a href="{% url 'detection_result' detection.id %}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                View
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-4 text-muted">
+                                <i class="fas fa-search fa-2x mb-3"></i>
+                                <p>No previous scans</p>
+                                <small>Your analysis history will appear here</small>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Supported Crops -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6><i class="fas fa-seedling me-2"></i>Supported Crops</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for crop in supported_crops %}
+                            <span class="badge bg-light text-dark border">{{ crop|title }}</span>
+                        {% endfor %}
+                    </div>
+                    <small class="text-muted mt-2">
+                        More crops being added regularly
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Camera Modal -->
+<div class="modal fade" id="cameraModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Take Photo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <video id="cameraVideo" width="100%" height="400" autoplay></video>
+                <canvas id="cameraCanvas" style="display: none;"></canvas>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="capturePhoto()">
+                    <i class="fas fa-camera me-1"></i>Capture
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let cameraStream = null;
+
+// Hide file input
+document.getElementById('id_crop_image').style.display = 'none';
+
+// File input change handler
+document.getElementById('id_crop_image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        displayImagePreview(file);
+        enableAnalyzeButton();
+    }
+});
+
+// Drag and drop handlers
+const uploadArea = document.getElementById('uploadArea');
+
+uploadArea.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', function() {
+    uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', function(e) {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        const file = files[0];
+        if (file.type.startsWith('image/')) {
+            const input = document.getElementById('id_crop_image');
+            input.files = files;
+            displayImagePreview(file);
+            enableAnalyzeButton();
+        } else {
+            alert('Please upload an image file');
+        }
+    }
+});
+
+uploadArea.addEventListener('click', function() {
+    document.getElementById('id_crop_image').click();
+});
+
+function displayImagePreview(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('imagePreview').src = e.target.result;
+        document.getElementById('previewContainer').style.display = 'block';
+        uploadArea.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeImage() {
+    document.getElementById('id_crop_image').value = '';
+    document.getElementById('previewContainer').style.display = 'none';
+    uploadArea.style.display = 'block';
+    disableAnalyzeButton();
+}
+
+function enableAnalyzeButton() {
+    const btn = document.getElementById('analyzeBtn');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-brain me-2"></i>Analyze with AI';
+}
+
+function disableAnalyzeButton() {
+    const btn = document.getElementById('analyzeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-upload me-2"></i>Upload Image First';
+}
+
+// Camera functionality
+function openCamera() {
+    $('#cameraModal').modal('show');
+    
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function(stream) {
+            cameraStream = stream;
+            document.getElementById('cameraVideo').srcObject = stream;
+        })
+        .catch(function(error) {
+            console.error('Camera error:', error);
+            alert('Unable to access camera. Please check permissions.');
+        });
+}
+
+function capturePhoto() {
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.getElementById('cameraCanvas');
+    const context = canvas.getContext('2d');
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    context.drawImage(video, 0, 0);
+    
+    canvas.toBlob(function(blob) {
+        const file = new File([blob], 'camera_capture.jpg', { type: 'image/jpeg' });
+        
+        // Create file list and assign to input
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        document.getElementById('id_crop_image').files = dataTransfer.files;
+        
+        displayImagePreview(file);
+        enableAnalyzeButton();
+        
+        // Close modal and stop camera
+        $('#cameraModal').modal('hide');
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+        }
+    }, 'image/jpeg', 0.8);
+}
+
+// Form submission with progress
+document.getElementById('diseaseDetectionForm').addEventListener('submit', function(e) {
+    const btn = document.getElementById('analyzeBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+    
+    progressContainer.style.display = 'block';
+    
+    // Simulate progress
+    let progress = 0;
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const statusText = document.getElementById('statusText');
+    
+    const statuses = [
+        'Uploading image...',
+        'Initializing AI models...',
+        'Analyzing crop features...',
+        'Detecting diseases...',
+        'Generating recommendations...',
+        'Finalizing results...'
+    ];
+    
+    const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 90) progress = 90;
+        
+        progressBar.style.width = progress + '%';
+        progressText.textContent = Math.round(progress) + '%';
+        
+        const statusIndex = Math.floor(progress / 15);
+        if (statusIndex < statuses.length) {
+            statusText.textContent = statuses[statusIndex];
+        }
+    }, 500);
+    
+    // Clear interval on form submission (page will redirect)
+    setTimeout(() => {
+        clearInterval(interval);
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+        statusText.textContent = 'Analysis complete! Redirecting...';
+    }, 3000);
+});
+
+// Close camera modal handler
+$('#cameraModal').on('hidden.bs.modal', function () {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+    }
+});
+
+// Initialize
+disableAnalyzeButton();
+</script>
+{%endblock%}

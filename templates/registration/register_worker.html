@@ -1,0 +1,900 @@
+<!-- templates/registration/register_worker.html -->
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Register Worker - AgriFish{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map {
+        height: 300px;
+        width: 100%;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    .service-area-preview {
+        border: 2px dashed #28a745;
+        padding: 20px;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        text-align: center;
+        margin-top: 10px;
+    }
+    .equipment-tag {
+        display: inline-block;
+        background-color: #e9ecef;
+        padding: 5px 10px;
+        margin: 2px;
+        border-radius: 15px;
+        font-size: 0.85rem;
+    }
+    .rate-preview {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-lg">
+                <div class="card-header bg-success text-white text-center">
+                    <h3><i class="fas fa-tools me-2"></i>Register as Service Provider</h3>
+                    <p class="mb-0">Join AgriFish network and start earning by providing agricultural services</p>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="workerRegistrationForm">
+                        {% csrf_token %}
+                        
+                        <!-- Progress Steps -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="step-item active">
+                                        <div class="step-circle">1</div>
+                                        <small>Personal Info</small>
+                                    </div>
+                                    <div class="step-line"></div>
+                                    <div class="step-item">
+                                        <div class="step-circle">2</div>
+                                        <small>Service Details</small>
+                                    </div>
+                                    <div class="step-line"></div>
+                                    <div class="step-item">
+                                        <div class="step-circle">3</div>
+                                        <small>Location & Area</small>
+                                    </div>
+                                    <div class="step-line"></div>
+                                    <div class="step-item">
+                                        <div class="step-circle">4</div>
+                                        <small>Verification</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 1: Personal Information -->
+                        <div class="step-content" id="step1">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5 class="text-success mb-3"><i class="fas fa-user me-2"></i>Personal Information</h5>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">First Name *</label>
+                                                {{ form.first_name }}
+                                                {% if form.first_name.errors %}
+                                                    <div class="text-danger small">{{ form.first_name.errors.0 }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">Last Name *</label>
+                                                {{ form.last_name }}
+                                                {% if form.last_name.errors %}
+                                                    <div class="text-danger small">{{ form.last_name.errors.0 }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Username *</label>
+                                        {{ form.username }}
+                                        <small class="text-muted">This will be your login ID</small>
+                                        {% if form.username.errors %}
+                                            <div class="text-danger small">{{ form.username.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Email Address *</label>
+                                        {{ form.email }}
+                                        {% if form.email.errors %}
+                                            <div class="text-danger small">{{ form.email.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Phone Number *</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">+91</span>
+                                            {{ form.phone }}
+                                        </div>
+                                        {% if form.phone.errors %}
+                                            <div class="text-danger small">{{ form.phone.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h5 class="text-success mb-3"><i class="fas fa-lock me-2"></i>Security</h5>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Password *</label>
+                                        {{ form.password1 }}
+                                        <div class="password-strength" id="passwordStrength"></div>
+                                        {% if form.password1.errors %}
+                                            <div class="text-danger small">{{ form.password1.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Confirm Password *</label>
+                                        {{ form.password2 }}
+                                        {% if form.password2.errors %}
+                                            <div class="text-danger small">{{ form.password2.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Preferred Language</label>
+                                        {{ form.preferred_language }}
+                                    </div>
+                                    
+                                    <!-- Profile Photo Upload -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Profile Photo (Optional)</label>
+                                        <div class="d-flex align-items-center">
+                                            <div class="profile-preview me-3">
+                                                <img id="profilePreview" src="https://via.placeholder.com/80x80/28a745/ffffff?text=Photo" 
+                                                     alt="Profile Preview" class="rounded-circle" style="width: 80px; height: 80px;">
+                                            </div>
+                                            <div>
+                                                <input type="file" class="form-control" accept="image/*" id="profilePhoto">
+                                                <small class="text-muted">Recommended: 200x200px, Max 2MB</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-end">
+                                <button type="button" class="btn btn-success" onclick="nextStep(2)">
+                                    Next: Service Details <i class="fas fa-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 2: Service Details -->
+                        <div class="step-content d-none" id="step2">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5 class="text-success mb-3"><i class="fas fa-cogs me-2"></i>Service Information</h5>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Years of Experience *</label>
+                                        {{ form.experience_years }}
+                                        <small class="text-muted">Years of experience in agricultural services</small>
+                                        {% if form.experience_years.errors %}
+                                            <div class="text-danger small">{{ form.experience_years.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Hourly Rate (₹) *</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">₹</span>
+                                            {{ form.hourly_rate }}
+                                            <span class="input-group-text">/hour</span>
+                                        </div>
+                                        <small class="text-muted">Your service charge per hour</small>
+                                        {% if form.hourly_rate.errors %}
+                                            <div class="text-danger small">{{ form.hourly_rate.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Service Radius (km) *</label>
+                                        {{ form.service_radius_km }}
+                                        <small class="text-muted">How far are you willing to travel for work?</small>
+                                        {% if form.service_radius_km.errors %}
+                                            <div class="text-danger small">{{ form.service_radius_km.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Service Types -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Services Offered</label>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="pesticide_spray" id="service1" checked>
+                                                    <label class="form-check-label" for="service1">
+                                                        <i class="fas fa-spray-can me-2"></i>Pesticide Spraying
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="fertilizer_spray" id="service2">
+                                                    <label class="form-check-label" for="service2">
+                                                        <i class="fas fa-seedling me-2"></i>Fertilizer Application
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="weed_control" id="service3">
+                                                    <label class="form-check-label" for="service3">
+                                                        <i class="fas fa-leaf me-2"></i>Weed Control
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="crop_monitoring" id="service4">
+                                                    <label class="form-check-label" for="service4">
+                                                        <i class="fas fa-search me-2"></i>Crop Monitoring
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="harvesting" id="service5">
+                                                    <label class="form-check-label" for="service5">
+                                                        <i class="fas fa-cut me-2"></i>Harvesting Support
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" value="other" id="service6">
+                                                    <label class="form-check-label" for="service6">
+                                                        <i class="fas fa-plus me-2"></i>Other Services
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h5 class="text-success mb-3"><i class="fas fa-tools me-2"></i>Equipment & Expertise</h5>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Equipment Owned *</label>
+                                        {{ form.equipment_owned }}
+                                        <small class="text-muted">List your equipment (comma separated)</small>
+                                        {% if form.equipment_owned.errors %}
+                                            <div class="text-danger small">{{ form.equipment_owned.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Quick Equipment Selection -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Quick Select Equipment</label>
+                                        <div class="equipment-grid">
+                                            <button type="button" class="btn btn-outline-primary btn-sm equipment-btn" data-equipment="Knapsack Sprayer">
+                                                <i class="fas fa-spray-can"></i> Knapsack Sprayer
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm equipment-btn" data-equipment="Power Sprayer">
+                                                <i class="fas fa-tools"></i> Power Sprayer
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm equipment-btn" data-equipment="Drone">
+                                                <i class="fas fa-helicopter"></i> Drone
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm equipment-btn" data-equipment="Tractor">
+                                                <i class="fas fa-tractor"></i> Tractor
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm equipment-btn" data-equipment="Hand Tools">
+                                                <i class="fas fa-hand-paper"></i> Hand Tools
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm equipment-btn" data-equipment="Protective Gear">
+                                                <i class="fas fa-shield-alt"></i> Safety Gear
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Specialization -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Crop Specialization</label>
+                                        <select multiple class="form-select" id="cropSpecialization" style="height: 120px;">
+                                            <option value="wheat">Wheat</option>
+                                            <option value="rice">Rice</option>
+                                            <option value="corn">Corn/Maize</option>
+                                            <option value="tomato">Tomato</option>
+                                            <option value="potato">Potato</option>
+                                            <option value="cotton">Cotton</option>
+                                            <option value="soybean">Soybean</option>
+                                            <option value="sugarcane">Sugarcane</option>
+                                            <option value="vegetables">Vegetables</option>
+                                            <option value="fruits">Fruits</option>
+                                        </select>
+                                        <small class="text-muted">Hold Ctrl/Cmd to select multiple crops</small>
+                                    </div>
+                                    
+                                    <!-- Rate Preview -->
+                                    <div class="rate-preview">
+                                        <h6><i class="fas fa-calculator me-2"></i>Rate Preview</h6>
+                                        <h4 id="rateDisplay">₹0/hour</h4>
+                                        <small>Your earning potential per job</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" onclick="prevStep(1)">
+                                    <i class="fas fa-arrow-left me-1"></i> Back
+                                </button>
+                                <button type="button" class="btn btn-success" onclick="nextStep(3)">
+                                    Next: Location Setup <i class="fas fa-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 3: Location & Service Area -->
+                        <div class="step-content d-none" id="step3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5 class="text-success mb-3"><i class="fas fa-map-marker-alt me-2"></i>Your Location</h5>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Complete Address *</label>
+                                        {{ form.address }}
+                                        {% if form.address.errors %}
+                                            <div class="text-danger small">{{ form.address.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Mark Your Location</label>
+                                        <div id="map"></div>
+                                        {{ form.latitude }}
+                                        {{ form.longitude }}
+                                        <small class="text-muted">Click on the map to mark your exact location</small>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <button type="button" class="btn btn-outline-primary" id="getCurrentLocation">
+                                            <i class="fas fa-crosshairs me-2"></i>Use My Current Location
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h5 class="text-success mb-3"><i class="fas fa-circle-notch me-2"></i>Service Area</h5>
+                                    
+                                    <div class="service-area-preview">
+                                        <i class="fas fa-map fa-3x text-success mb-3"></i>
+                                        <h6>Service Coverage</h6>
+                                        <p class="mb-2">Radius: <span id="radiusDisplay">10</span> km</p>
+                                        <p class="text-muted">You'll receive job requests within this area</p>
+                                        <button type="button" class="btn btn-success btn-sm" id="previewServiceArea">
+                                            <i class="fas fa-eye me-1"></i>Preview on Map
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Nearby Areas -->
+                                    <div class="mt-3">
+                                        <h6>Areas You'll Cover:</h6>
+                                        <div id="nearbyAreas" class="d-flex flex-wrap gap-2">
+                                            <span class="badge bg-light text-dark">Loading...</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Working Hours -->
+                                    <div class="mt-4">
+                                        <h6><i class="fas fa-clock me-2"></i>Preferred Working Hours</h6>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <label class="form-label">Start Time</label>
+                                                <input type="time" class="form-control" value="06:00">
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label">End Time</label>
+                                                <input type="time" class="form-control" value="18:00">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" onclick="prevStep(2)">
+                                    <i class="fas fa-arrow-left me-1"></i> Back
+                                </button>
+                                <button type="button" class="btn btn-success" onclick="nextStep(4)">
+                                    Final Step <i class="fas fa-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 4: Verification & Terms -->
+                        <div class="step-content d-none" id="step4">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5 class="text-success mb-3"><i class="fas fa-check-circle me-2"></i>Verification</h5>
+                                    
+                                    <!-- ID Verification -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Government ID Proof</label>
+                                        <select class="form-select" id="idType">
+                                            <option value="">Select ID Type</option>
+                                            <option value="aadhar">Aadhaar Card</option>
+                                            <option value="pan">PAN Card</option>
+                                            <option value="voter">Voter ID</option>
+                                            <option value="license">Driving License</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">ID Number</label>
+                                        <input type="text" class="form-control" id="idNumber" placeholder="Enter ID number">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Upload ID Document</label>
+                                        <input type="file" class="form-control" accept="image/*,.pdf" id="idDocument">
+                                        <small class="text-muted">Upload clear photo of your ID (JPG, PNG or PDF)</small>
+                                    </div>
+                                    
+                                    <!-- Bank Details -->
+                                    <div class="mb-3">
+                                        <h6><i class="fas fa-university me-2"></i>Bank Details (for payments)</h6>
+                                        <div class="row">
+                                            <div class="col-12 mb-2">
+                                                <input type="text" class="form-control" placeholder="Account Holder Name">
+                                            </div>
+                                            <div class="col-6 mb-2">
+                                                <input type="text" class="form-control" placeholder="Account Number">
+                                            </div>
+                                            <div class="col-6 mb-2">
+                                                <input type="text" class="form-control" placeholder="IFSC Code">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h5 class="text-success mb-3"><i class="fas fa-file-contract me-2"></i>Review & Submit</h5>
+                                    
+                                    <!-- Registration Summary -->
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6>Registration Summary</h6>
+                                            <table class="table table-sm">
+                                                <tr>
+                                                    <td>Name:</td>
+                                                    <td><span id="summaryName">-</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Phone:</td>
+                                                    <td><span id="summaryPhone">-</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Service Radius:</td>
+                                                    <td><span id="summaryRadius">-</span> km</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Hourly Rate:</td>
+                                                    <td>₹<span id="summaryRate">-</span>/hour</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Experience:</td>
+                                                    <td><span id="summaryExp">-</span> years</td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Terms and Conditions -->
+                                    <div class="mt-3">
+                                        <h6>Terms & Conditions</h6>
+                                        <div class="border p-3 rounded" style="height: 150px; overflow-y: auto; font-size: 0.9rem;">
+                                            <p><strong>AgriFish Service Provider Agreement:</strong></p>
+                                            <p>1. You agree to provide quality agricultural services to farmers.</p>
+                                            <p>2. All services must be completed as per agreed terms and timeline.</p>
+                                            <p>3. You are responsible for your own equipment and safety measures.</p>
+                                            <p>4. Payment will be processed after service completion and farmer confirmation.</p>
+                                            <p>5. Maintain professionalism and respect farmer's property.</p>
+                                            <p>6. Any disputes will be resolved through AgriFish platform.</p>
+                                            <p>7. You can update your availability and rates through your dashboard.</p>
+                                        </div>
+                                        
+                                        <div class="form-check mt-3">
+                                            <input class="form-check-input" type="checkbox" id="agreeTerms" required>
+                                            <label class="form-check-label" for="agreeTerms">
+                                                I agree to the Terms & Conditions and Privacy Policy
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="agreeUpdates">
+                                            <label class="form-check-label" for="agreeUpdates">
+                                                I want to receive job notifications and updates via SMS/Email
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" onclick="prevStep(3)">
+                                    <i class="fas fa-arrow-left me-1"></i> Back
+                                </button>
+                                <button type="submit" class="btn btn-success btn-lg" id="submitBtn" disabled>
+                                    <i class="fas fa-user-plus me-2"></i>Complete Registration
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Form Errors -->
+                        {% if form.errors %}
+                            <div class="alert alert-danger mt-4">
+                                <h6><i class="fas fa-exclamation-triangle me-2"></i>Please fix the following errors:</h6>
+                                <ul class="mb-0">
+                                    {% for field, errors in form.errors.items %}
+                                        {% for error in errors %}
+                                            <li>{{ field|capfirst }}: {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Already Registered -->
+            <div class="text-center mt-4">
+                <p class="mb-0">Already have an account? <a href="{% url 'login' %}" class="text-success">Login here</a></p>
+                <p class="mt-2 mb-0">Want to register as farmer? <a href="{% url 'register_farmer' %}" class="text-primary">Register as Farmer</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap" async defer></script>
+<script>
+let map;
+let marker;
+let serviceAreaCircle;
+let currentStep = 1;
+
+// Initialize Google Maps
+function initMap() {
+    const defaultLat = 28.6139;
+    const defaultLng = 77.2090;
+    
+    map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 12,
+        center: { lat: defaultLat, lng: defaultLng }
+    });
+    
+    // Try to get user's location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const userLat = position.coords.latitude;
+            const userLng = position.coords.longitude;
+            
+            map.setCenter({ lat: userLat, lng: userLng });
+            updateMarker(userLat, userLng);
+        });
+    }
+    
+    // Map click event
+    map.addListener('click', function(e) {
+        updateMarker(e.latLng.lat(), e.latLng.lng());
+    });
+}
+
+function updateMarker(lat, lng) {
+    if (marker) {
+        marker.setPosition({ lat: lat, lng: lng });
+    } else {
+        marker = new google.maps.Marker({
+            position: { lat: lat, lng: lng },
+            map: map,
+            draggable: true,
+            title: 'Your Location'
+        });
+        
+        marker.addListener('dragend', function() {
+            const position = marker.getPosition();
+            document.getElementById('id_latitude').value = position.lat();
+            document.getElementById('id_longitude').value = position.lng();
+            updateServiceArea();
+        });
+    }
+    
+    document.getElementById('id_latitude').value = lat;
+    document.getElementById('id_longitude').value = lng;
+    updateServiceArea();
+}
+
+// Step Navigation
+function nextStep(step) {
+    if (validateStep(currentStep)) {
+        document.getElementById(`step${currentStep}`).classList.add('d-none');
+        document.getElementById(`step${step}`).classList.remove('d-none');
+        
+        // Update step indicators
+        updateStepIndicators(step);
+        currentStep = step;
+        
+        // Update summary on final step
+        if (step === 4) {
+            updateSummary();
+        }
+    }
+}
+
+function prevStep(step) {
+    document.getElementById(`step${currentStep}`).classList.add('d-none');
+    document.getElementById(`step${step}`).classList.remove('d-none');
+    updateStepIndicators(step);
+    currentStep = step;
+}
+
+function updateStepIndicators(activeStep) {
+    document.querySelectorAll('.step-item').forEach((item, index) => {
+        if (index + 1 <= activeStep) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
+function validateStep(step) {
+    let isValid = true;
+    const requiredFields = {
+        1: ['first_name', 'last_name', 'username', 'email', 'phone', 'password1', 'password2'],
+        2: ['experience_years', 'hourly_rate', 'service_radius_km', 'equipment_owned'],
+        3: ['address', 'latitude', 'longitude']
+    };
+    
+    if (requiredFields[step]) {
+        requiredFields[step].forEach(fieldName => {
+            const field = document.getElementById(`id_${fieldName}`);
+            if (field && !field.value.trim()) {
+                field.classList.add('is-invalid');
+                isValid = false;
+            } else if (field) {
+                field.classList.remove('is-invalid');
+            }
+        });
+    }
+    
+    if (!isValid) {
+        alert('Please fill all required fields before proceeding.');
+    }
+    
+    return isValid;
+}
+
+function updateSummary() {
+    document.getElementById('summaryName').textContent = 
+        `${document.getElementById('id_first_name').value} ${document.getElementById('id_last_name').value}`;
+    document.getElementById('summaryPhone').textContent = document.getElementById('id_phone').value;
+    document.getElementById('summaryRadius').textContent = document.getElementById('id_service_radius_km').value;
+    document.getElementById('summaryRate').textContent = document.getElementById('id_hourly_rate').value;
+    document.getElementById('summaryExp').textContent = document.getElementById('id_experience_years').value;
+}
+
+// Service Area Updates
+function updateServiceArea() {
+    const radius = parseInt(document.getElementById('id_service_radius_km').value) || 10;
+    document.getElementById('radiusDisplay').textContent = radius;
+    
+    if (serviceAreaCircle) {
+        serviceAreaCircle.setMap(null);
+    }
+    
+    if (marker) {
+        serviceAreaCircle = new google.maps.Circle({
+            strokeColor: '#28a745',
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            fillColor: '#28a745',
+            fillOpacity: 0.15,
+            map: map,
+            center: marker.getPosition(),
+            radius: radius * 1000 // Convert km to meters
+        });
+    }
+    
+    // Simulate nearby areas
+    const areas = ['Village A', 'Village B', 'Town C', 'Area D'];
+    const nearbyAreasHtml = areas.slice(0, Math.min(4, radius / 5 + 1))
+        .map(area => `<span class="badge bg-success">${area}</span>`).join(' ');
+    document.getElementById('nearbyAreas').innerHTML = nearbyAreasHtml;
+}
+
+// Equipment Management
+document.addEventListener('DOMContentLoaded', function() {
+    // Equipment quick select
+    document.querySelectorAll('.equipment-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const equipment = this.dataset.equipment;
+            const equipmentField = document.getElementById('id_equipment_owned');
+            const currentValue = equipmentField.value;
+            
+            if (currentValue.includes(equipment)) {
+                // Remove equipment
+                const newValue = currentValue.split(',')
+                    .map(item => item.trim())
+                    .filter(item => item !== equipment)
+                    .join(', ');
+                equipmentField.value = newValue;
+                this.classList.remove('btn-primary');
+                this.classList.add('btn-outline-primary');
+            } else {
+                // Add equipment
+                const newValue = currentValue ? `${currentValue}, ${equipment}` : equipment;
+                equipmentField.value = newValue;
+                this.classList.remove('btn-outline-primary');
+                this.classList.add('btn-primary');
+            }
+        });
+    });
+    
+    // Rate display update
+    const rateField = document.getElementById('id_hourly_rate');
+    const rateDisplay = document.getElementById('rateDisplay');
+    
+    function updateRateDisplay() {
+        const rate = rateField.value || 0;
+        rateDisplay.textContent = `₹${rate}/hour`;
+    }
+    
+    rateField.addEventListener('input', updateRateDisplay);
+    updateRateDisplay();
+    
+    // Service radius update
+    document.getElementById('id_service_radius_km').addEventListener('input', updateServiceArea);
+    
+    // Terms checkbox
+    document.getElementById('agreeTerms').addEventListener('change', function() {
+        document.getElementById('submitBtn').disabled = !this.checked;
+    });
+    
+    // Get current location
+    document.getElementById('getCurrentLocation').addEventListener('click', function() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                map.setCenter({ lat: lat, lng: lng });
+                updateMarker(lat, lng);
+            });
+        } else {
+            alert('Geolocation is not supported by this browser.');
+        }
+    });
+    
+    // Profile photo preview
+    document.getElementById('profilePhoto').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('profilePreview').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    // Password strength checker
+    document.getElementById('id_password1').addEventListener('input', function() {
+        const password = this.value;
+        const strengthDiv = document.getElementById('passwordStrength');
+        
+        if (password.length === 0) {
+            strengthDiv.innerHTML = '';
+            return;
+        }
+        
+        let strength = 0;
+        let feedback = [];
+        
+        if (password.length >= 8) strength++;
+        else feedback.push('At least 8 characters');
+        
+        if (password.match(/[a-z]/)) strength++;
+        else feedback.push('Lowercase letters');
+        
+        if (password.match(/[A-Z]/)) strength++;
+        else feedback.push('Uppercase letters');
+        
+        if (password.match(/[0-9]/)) strength++;
+        else feedback.push('Numbers');
+        
+        const colors = ['danger', 'warning', 'info', 'success'];
+        const texts = ['Weak', 'Fair', 'Good', 'Strong'];
+        
+        strengthDiv.innerHTML = `
+            <div class="progress mt-1" style="height: 4px;">
+                <div class="progress-bar bg-${colors[strength-1]}" style="width: ${strength*25}%"></div>
+            </div>
+            <small class="text-${colors[strength-1]}">${texts[strength-1] || 'Very Weak'}</small>
+        `;
+    });
+});
+
+// Preview service area on map
+document.getElementById('previewServiceArea').addEventListener('click', function() {
+    if (marker && serviceAreaCircle) {
+        map.setCenter(marker.getPosition());
+        map.setZoom(11);
+    }
+});
+</script>
+
+<style>
+.step-item {
+    text-align: center;
+    position: relative;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 8px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.step-item.active .step-circle {
+    background-color: #28a745;
+    color: white;
+}
+
+.step-line {
+    flex: 1;
+    height: 2px;
+    background-color: #e9ecef;
+    margin: 20px 10px 0;
+}
+
+.step-item.active + .step-line {
+    background-color: #28a745;
+}
+
+.equipment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.equipment-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.is-invalid {
+    border-color: #dc3545 !important;
+}
+</style>
+{% endblock %}

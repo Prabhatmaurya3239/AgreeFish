@@ -1,0 +1,591 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile Settings - AgriFish{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-header {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+    }
+    .settings-card {
+        border: none;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border-radius: 10px;
+    }
+    .profile-picture {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        border: 5px solid white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Profile Header -->
+    <div class="profile-header">
+        <div class="row align-items-center">
+            <div class="col-md-3 text-center">
+                <img src="{% if user.userprofile.profile_image %}{{ user.userprofile.profile_image.url }}{% else %}https://via.placeholder.com/120x120/28a745/ffffff?text={{ user.first_name.0|default:'U' }}{{ user.last_name.0|default:'' }}{% endif %}" 
+                     alt="Profile Picture" class="rounded-circle profile-picture" id="profileImage">
+                <div class="mt-2">
+                    <button class="btn btn-light btn-sm" onclick="document.getElementById('profilePicture').click()">
+                        <i class="fas fa-camera me-1"></i>Change Photo
+                    </button>
+                    <input type="file" id="profilePicture" accept="image/*" style="display: none;">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h3>{{ user.get_full_name|default:user.username }}</h3>
+                <p class="mb-1">
+                    <i class="fas fa-{{ user.userprofile.user_type|yesno:'seedling,tools' }} me-2"></i>
+                    {{ user.userprofile.get_user_type_display }}
+                </p>
+                <p class="mb-1">
+                    <i class="fas fa-phone me-2"></i>{{ user.userprofile.phone }}
+                </p>
+                <p class="mb-0">
+                    <i class="fas fa-envelope me-2"></i>{{ user.email }}
+                </p>
+            </div>
+            <div class="col-md-3 text-center">
+                <div class="row">
+                    {% if user.userprofile.user_type == 'farmer' %}
+                        <div class="col-6">
+                            <h4>{{ user.userprofile.farmerprofile.farm_size_acres }}</h4>
+                            <small>Acres</small>
+                        </div>
+                        <div class="col-6">
+                            <h4>{{ user.farmer_bookings.count }}</h4>
+                            <small>Bookings</small>
+                        </div>
+                    {% else %}
+                        <div class="col-6">
+                            <h4>{{ user.userprofile.workerprofile.rating|floatformat:1 }}</h4>
+                            <small>Rating</small>
+                        </div>
+                        <div class="col-6">
+                            <h4>{{ user.userprofile.workerprofile.total_jobs }}</h4>
+                            <small>Jobs</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Settings Navigation -->
+        <div class="col-md-3">
+            <div class="settings-card card">
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <a href="#personal" class="list-group-item list-group-item-action active" data-bs-toggle="pill">
+                            <i class="fas fa-user me-2"></i>Personal Information
+                        </a>
+                        <a href="#location" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                            <i class="fas fa-map-marker-alt me-2"></i>Location & Address
+                        </a>
+                        <a href="#preferences" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                            <i class="fas fa-cog me-2"></i>Preferences
+                        </a>
+                        {% if user.userprofile.user_type == 'farmer' %}
+                            <a href="#farm" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                                <i class="fas fa-seedling me-2"></i>Farm Details
+                            </a>
+                        {% else %}
+                            <a href="#service" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                                <i class="fas fa-tools me-2"></i>Service Settings
+                            </a>
+                        {% endif %}
+                        <a href="#security" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                            <i class="fas fa-shield-alt me-2"></i>Security
+                        </a>
+                        <a href="#notifications" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                            <i class="fas fa-bell me-2"></i>Notifications
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Content -->
+        <div class="col-md-9">
+            <div class="tab-content">
+                <!-- Personal Information -->
+                <div class="tab-pane fade show active" id="personal">
+                    <div class="settings-card card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-user me-2"></i>Personal Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="personalForm">
+                                {% csrf_token %}
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">First Name</label>
+                                            <input type="text" class="form-control" name="first_name" value="{{ user.first_name }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Last Name</label>
+                                            <input type="text" class="form-control" name="last_name" value="{{ user.last_name }}" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Email</label>
+                                            <input type="email" class="form-control" name="email" value="{{ user.email }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Phone Number</label>
+                                            <input type="tel" class="form-control" name="phone" value="{{ user.userprofile.phone }}" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save me-2"></i>Save Changes
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location & Address -->
+                <div class="tab-pane fade" id="location">
+                    <div class="settings-card card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-map-marker-alt me-2"></i>Location & Address</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="locationForm">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label class="form-label">Complete Address</label>
+                                    <textarea class="form-control" name="address" rows="3" required>{{ user.userprofile.address }}</textarea>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Location on Map</label>
+                                    <div id="settingsMap" style="height: 300px; border-radius: 8px;"></div>
+                                    <input type="hidden" name="latitude" value="{{ user.userprofile.latitude }}">
+                                    <input type="hidden" name="longitude" value="{{ user.userprofile.longitude }}">
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <button type="button" class="btn btn-outline-primary" onclick="getCurrentLocation()">
+                                            <i class="fas fa-crosshairs me-2"></i>Use Current Location
+                                        </button>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="fas fa-save me-2"></i>Save Location
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preferences -->
+                <div class="tab-pane fade" id="preferences">
+                    <div class="settings-card card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-cog me-2"></i>Preferences</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="preferencesForm">
+                                {% csrf_token %}
+                                <div class="mb-4">
+                                    <label class="form-label">Preferred Language</label>
+                                    <select class="form-select" name="preferred_language">
+                                        <option value="en" {% if user.userprofile.preferred_language == 'en' %}selected{% endif %}>English</option>
+                                        <option value="hi" {% if user.userprofile.preferred_language == 'hi' %}selected{% endif %}>हिंदी (Hindi)</option>
+                                        <option value="te" {% if user.userprofile.preferred_language == 'te' %}selected{% endif %}>తెలుగు (Telugu)</option>
+                                        <option value="ta" {% if user.userprofile.preferred_language == 'ta' %}selected{% endif %}>தமிழ் (Tamil)</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-4">
+                                    <h6>Voice Assistant Settings</h6>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="enableVoice" checked>
+                                        <label class="form-check-label" for="enableVoice">
+                                            Enable voice notifications
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="autoTranslate" checked>
+                                        <label class="form-check-label" for="autoTranslate">
+                                            Auto-translate disease suggestions
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <h6>Display Settings</h6>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="darkMode">
+                                        <label class="form-check-label" for="darkMode">
+                                            Dark mode (Coming soon)
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="compactView">
+                                        <label class="form-check-label" for="compactView">
+                                            Compact dashboard view
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save me-2"></i>Save Preferences
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Farm/Service Details -->
+                {% if user.userprofile.user_type == 'farmer' %}
+                <div class="tab-pane fade" id="farm">
+                    <div class="settings-card card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-seedling me-2"></i>Farm Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="farmForm">
+                                {% csrf_token %}
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Farm Name</label>
+                                            <input type="text" class="form-control" name="farm_name" value="{{ user.userprofile.farmerprofile.farm_name }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Farm Size (Acres)</label>
+                                            <input type="number" class="form-control" name="farm_size_acres" value="{{ user.userprofile.farmerprofile.farm_size_acres }}" step="0.1" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Crops Grown</label>
+                                    <textarea class="form-control" name="crops_grown" rows="3" placeholder="List crops you grow...">{{ user.userprofile.farmerprofile.crops_grown }}</textarea>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save me-2"></i>Update Farm Details
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="tab-pane fade" id="service">
+                    <div class="settings-card card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-tools me-2"></i>Service Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="serviceForm">
+                                {% csrf_token %}
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Hourly Rate (₹)</label>
+                                            <input type="number" class="form-control" name="hourly_rate" value="{{ user.userprofile.workerprofile.hourly_rate }}" step="0.01" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Service Radius (km)</label>
+                                            <input type="number" class="form-control" name="service_radius_km" value="{{ user.userprofile.workerprofile.service_radius_km }}" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Equipment Owned</label>
+                                    <textarea class="form-control" name="equipment_owned" rows="3">{{ user.userprofile.workerprofile.equipment_owned }}</textarea>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="is_available" id="availability" {% if user.userprofile.workerprofile.is_available %}checked{% endif %}>
+                                        <label class="form-check-label" for="availability">
+                                            Currently available for new jobs
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save me-2"></i>Update Service Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Security -->
+                <div class="tab-pane fade" id="security">
+                    <div class="settings-card card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-shield-alt me-2"></i>Security Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="securityForm">
+                                {% csrf_token %}
+                                <div class="mb-4">
+                                    <h6>Change Password</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">Current Password</label>
+                                        <input type="password" class="form-control" name="current_password">
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">New Password</label>
+                                                <input type="password" class="form-control" name="new_password">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">Confirm New Password</label>
+                                                <input type="password" class="form-control" name="confirm_password">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <h6>Two-Factor Authentication</h6>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="twoFactor">
+                                        <label class="form-check-label" for="twoFactor">
+                                            Enable SMS OTP for login (Coming soon)
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="fas fa-key me-2"></i>Update Security Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notification Settings -->
+                <div class="tab-pane fade" id="notifications">
+                    <div class="settings-card card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-bell me-2"></i>Notification Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="notificationForm">
+                                {% csrf_token %}
+                                <div class="mb-4">
+                                    <h6>Email Notifications</h6>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="emailBooking" checked>
+                                        <label class="form-check-label" for="emailBooking">
+                                            Booking updates and confirmations
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="emailPayment" checked>
+                                        <label class="form-check-label" for="emailPayment">
+                                            Payment confirmations
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="emailPromotions">
+                                        <label class="form-check-label" for="emailPromotions">
+                                            Promotional offers and updates
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <h6>SMS Notifications</h6>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="smsBooking" checked>
+                                        <label class="form-check-label" for="smsBooking">
+                                            Important booking updates
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="smsOTP" checked>
+                                        <label class="form-check-label" for="smsOTP">
+                                            OTP and security alerts
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <h6>Push Notifications</h6>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="pushReal" checked>
+                                        <label class="form-check-label" for="pushReal">
+                                            Real-time updates
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="pushDisease" checked>
+                                        <label class="form-check-label" for="pushDisease">
+                                            Disease detection results
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save me-2"></i>Save Notification Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initSettingsMap" async defer></script>
+<script>
+let settingsMap;
+let settingsMarker;
+
+function initSettingsMap() {
+    const lat = parseFloat(document.querySelector('input[name="latitude"]').value) || 28.6139;
+    const lng = parseFloat(document.querySelector('input[name="longitude"]').value) || 77.2090;
+    
+    settingsMap = new google.maps.Map(document.getElementById('settingsMap'), {
+        zoom: 15,
+        center: { lat: lat, lng: lng }
+    });
+    
+    settingsMarker = new google.maps.Marker({
+        position: { lat: lat, lng: lng },
+        map: settingsMap,
+        draggable: true,
+        title: 'Your Location'
+    });
+    
+    settingsMarker.addListener('dragend', function() {
+        const position = settingsMarker.getPosition();
+        document.querySelector('input[name="latitude"]').value = position.lat();
+        document.querySelector('input[name="longitude"]').value = position.lng();
+    });
+    
+    settingsMap.addListener('click', function(e) {
+        settingsMarker.setPosition(e.latLng);
+        document.querySelector('input[name="latitude"]').value = e.latLng.lat();
+        document.querySelector('input[name="longitude"]').value = e.latLng.lng();
+    });
+}
+
+function getCurrentLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            settingsMap.setCenter({ lat: lat, lng: lng });
+            settingsMarker.setPosition({ lat: lat, lng: lng });
+            
+            document.querySelector('input[name="latitude"]').value = lat;
+            document.querySelector('input[name="longitude"]').value = lng;
+        });
+    }
+}
+
+// Profile picture upload
+document.getElementById('profilePicture').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('profileImage').src = e.target.result;
+            
+            // Upload image via AJAX
+            const formData = new FormData();
+            formData.append('profile_image', file);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            fetch('/api/update-profile-picture/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Profile picture updated successfully!', 'success');
+                }
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Form submissions with AJAX
+document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+        submitBtn.disabled = true;
+        
+        fetch('/api/update-profile/', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Settings updated successfully!', 'success');
+            } else {
+                showToast('Error updating settings: ' + data.error, 'error');
+            }
+        })
+        .finally(() => {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
+    });
+});
+
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999;';
+    toast.innerHTML = message + '<button type="button" class="btn-close ms-2" onclick="this.parentElement.remove()"></button>';
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.remove(), 5000);
+}
+</script>
+{% endblock %}

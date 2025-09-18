@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+
+{% block title %}Notifications - AgriFish{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    {% csrf_token %}
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-bell me-2"></i>Notifications</h2>
+                <div class="btn-group">
+                    <button class="btn btn-outline-primary" onclick="markAllRead()">
+                        <i class="fas fa-check-double me-2"></i>Mark All Read
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="clearAll()">
+                        <i class="fas fa-trash me-2"></i>Clear All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Categories -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <ul class="nav nav-pills" id="notificationTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="all-tab" data-bs-toggle="pill" data-bs-target="#all" type="button">
+                        <i class="fas fa-bell me-1"></i>All ({{ notifications|length }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="booking-tab" data-bs-toggle="pill" data-bs-target="#booking" type="button">
+                        <i class="fas fa-calendar me-1"></i>Bookings
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="disease-tab" data-bs-toggle="pill" data-bs-target="#disease" type="button">
+                        <i class="fas fa-microscope me-1"></i>Disease Detection
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="payment-tab" data-bs-toggle="pill" data-bs-target="#payment" type="button">
+                        <i class="fas fa-credit-card me-1"></i>Payments
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Notification Content -->
+    <div class="row">
+        <div class="col-12">
+            <div class="tab-content" id="notificationTabContent">
+                <!-- All Notifications -->
+                <div class="tab-pane fade show active" id="all" role="tabpanel">
+                    {% if notifications %}
+                        {% for notification in notifications %}
+                        <div class="card mb-3 notification-card {% if not notification.is_read %}unread{% endif %}" data-id="{{ notification.id }}">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-md-1 text-center">
+                                        {% if notification.notification_type == 'booking_created' %}
+                                            <i class="fas fa-calendar-plus text-primary fa-2x"></i>
+                                        {% elif notification.notification_type == 'booking_accepted' %}
+                                            <i class="fas fa-check-circle text-success fa-2x"></i>
+                                        {% elif notification.notification_type == 'booking_completed' %}
+                                            <i class="fas fa-flag-checkered text-success fa-2x"></i>
+                                        {% elif notification.notification_type == 'payment_success' %}
+                                            <i class="fas fa-credit-card text-info fa-2x"></i>
+                                        {% elif notification.notification_type == 'disease_detected' %}
+                                            <i class="fas fa-microscope text-warning fa-2x"></i>
+                                        {% else %}
+                                            <i class="fas fa-bell text-secondary fa-2x"></i>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-8">
+                                        <h6 class="mb-1">{{ notification.title }}</h6>
+                                        <p class="text-muted mb-1">{{ notification.message }}</p>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>{{ notification.created_at|timesince }} ago
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="col-md-3 text-end">
+                                        {% if not notification.is_read %}
+                                            <span class="badge bg-primary mb-2">New</span><br>
+                                        {% endif %}
+                                        
+                                        <div class="btn-group btn-group-sm">
+                                            {% if notification.related_booking %}
+                                                <button class="btn btn-outline-primary btn-sm" onclick="viewBooking({{ notification.related_booking.id }})">
+                                                    <i class="fas fa-eye me-1"></i>View
+                                                </button>
+                                            {% endif %}
+                                            
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="markAsRead({{ notification.id }})">
+                                                <i class="fas fa-check me-1"></i>Mark Read
+                                            </button>
+                                            
+                                            <button class="btn btn-outline-danger btn-sm" onclick="deleteNotification({{ notification.id }})">
+                                                <i class="fas fa-trash me-1"></i>Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Voice Playback for Important Notifications -->
+                                {% if notification.notification_type == 'disease_detected' or notification.notification_type == 'booking_accepted' %}
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-outline-success" onclick="speakNotification('{{ notification.message }}')">
+                                        <i class="fas fa-volume-up me-1"></i>Listen
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-bell-slash fa-4x text-muted mb-3"></i>
+                            <h5>No notifications</h5>
+                            <p class="text-muted">You're all caught up! New notifications will appear here.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Filtered Notifications (Similar structure for other tabs) -->
+                <div class="tab-pane fade" id="booking" role="tabpanel">
+                    {% for notification in notifications %}
+                        {% if 'booking' in notification.notification_type %}
+                            <!-- Same notification card structure -->
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                
+                <!-- Add more filtered tabs as needed -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Real-time notifications -->
+<script>
+// Real-time notification updates
+function checkNewNotifications() {
+    fetch('/api/notifications/unread-count/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.count > 0) {
+                document.getElementById('notificationCount').textContent = data.count;
+                document.getElementById('notificationCount').style.display = 'block';
+            }
+        });
+}
+
+// Text-to-speech for notifications
+function speakNotification(text) {
+    const speech = new SpeechSynthesisUtterance(text);
+    speech.lang = '{{ user.userprofile.preferred_language }}' === 'hi' ? 'hi-IN' : 'en-US';
+    speechSynthesis.speak(speech);
+}
+
+function markAsRead(notificationId) {
+    const formData = new FormData();
+    formData.append('action', 'mark_read');
+    formData.append('notification_id', notificationId);
+
+    fetch('/api/notifications/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const card = document.querySelector(`[data-id="${notificationId}"]`);
+            if (card) {
+                card.classList.remove('unread');
+                card.querySelector('.badge')?.remove();
+            }
+        }
+    });
+}
+
+
+function markAllRead() {
+    const formData = new FormData();
+    formData.append('action', 'mark_all_read');
+
+    fetch('/api/notifications/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function deleteNotification(notificationId) {
+    if (confirm('Delete this notification?')) {
+        fetch(`/api/notifications/delete/${notificationId}/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.querySelector(`[data-id="${notificationId}"]`)?.remove();
+            }
+        });
+    }
+}
+
+
+function clearAll() {
+    if (confirm('Clear all notifications? This cannot be undone.')) {
+        fetch('/api/notifications/clear-all/', {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+
+
+
+// Check for new notifications every 30 seconds
+setInterval(checkNewNotifications, 30000);
+
+// Initial load
+document.addEventListener('DOMContentLoaded', checkNewNotifications);
+</script>
+
+<style>
+.notification-card.unread {
+    border-left: 4px solid #28a745;
+    background-color: #f8fffa;
+}
+
+.notification-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.notification-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.nav-pills .nav-link {
+    color: #6c757d;
+}
+
+.nav-pills .nav-link.active {
+    background-color: #28a745;
+}
+</style>
+{% endblock %}
