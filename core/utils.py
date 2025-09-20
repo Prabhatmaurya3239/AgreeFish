@@ -13,6 +13,8 @@ from datetime import datetime
 from .models import WorkerProfile
 import google.generativeai as genai
 from PIL import Image
+import logging
+logger = logging.getLogger(__name__)
 
 # Configure Gemini AI
 genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -144,88 +146,6 @@ CROP_DISEASE_DATABASE = {
     }
 }
 
-def analyze_crop_with_gemini(image_path, crop_type, user_language='en'):
-    """
-    Advanced crop disease analysis using Gemini AI with comprehensive crop database
-    """
-    try:
-        # Get crop information from database
-        crop_info = CROP_DISEASE_DATABASE.get(crop_type.lower(), {})
-        plant_id = crop_info.get('plant_id', crop_type)
-        
-        # Load and encode image
-        with open(image_path, 'rb') as image_file:
-            image_data = base64.b64encode(image_file.read()).decode('utf-8')
-        
-        # Create comprehensive prompt for Gemini
-        prompt = f"""
-        You are an expert plant pathologist analyzing a {crop_type} crop image.
-        
-        Plant ID: {plant_id}
-        
-        Known diseases for this crop:
-        {json.dumps(crop_info.get('common_diseases', {}), indent=2)}
-        
-        Please analyze the image and provide:
-        1. Disease identification (if any) with confidence score (0-100)
-        2. Severity assessment (low/medium/high)
-        3. Specific symptoms observed
-        4. Treatment recommendations
-        5. Prevention measures
-        6. Urgency level (immediate/within_week/routine)
-        
-        If the plant appears healthy, indicate so clearly.
-        
-        Respond in JSON format:
-        {{
-            "plant_id": "{plant_id}",
-            "crop_type": "{crop_type}",
-            "is_healthy": boolean,
-            "disease_detected": "disease_name or null",
-            "disease_id": "scientific_id or null",
-            "confidence_score": number,
-            "severity": "low/medium/high",
-            "symptoms": ["symptom1", "symptom2"],
-            "treatment": "detailed treatment plan",
-            "prevention": "prevention measures",
-            "urgency": "immediate/within_week/routine",
-            "additional_notes": "any other observations"
-        }}
-        """
-        
-        # Initialize Gemini model
-        model = genai.GenerativeModel('gemini-1.5-pro')
-        
-        # Create the request with image
-        response = model.generate_content([
-            prompt,
-            {
-                "mime_type": "image/jpeg",
-                "data": image_data
-            }
-        ])
-        
-        # Parse response
-        result = json.loads(response.text)
-        
-        # Enhance with database information if disease matches
-        if result.get('disease_detected') and not result.get('is_healthy'):
-            disease_key = result['disease_detected'].lower().replace(' ', '_')
-            if disease_key in crop_info.get('common_diseases', {}):
-                db_disease = crop_info['common_diseases'][disease_key]
-                result['treatment'] = db_disease['treatment']
-                result['prevention'] = db_disease['prevention']
-                result['severity'] = db_disease['severity']
-        
-        # Translate to user's preferred language
-        if user_language != 'en':
-            result = translate_analysis_result(result, user_language)
-        
-        return result
-        
-    except Exception as e:
-        print(f"Gemini analysis error: {e}")
-        return fallback_disease_analysis(crop_type, user_language)
 
 def fallback_disease_analysis(crop_type, user_language='en'):
     """
@@ -322,6 +242,7 @@ def gemini_chat_assistant(user_message, context, language):
         - Seasonal farming tips
         - Organic and sustainable methods
         - Local farming techniques suitable for Indian agriculture
+        - give me all output 5 or 6 lines 
         
         Keep responses concise, practical, and easy to understand.
         If asked about anything outside agriculture, politely redirect to farming topics.
@@ -648,234 +569,106 @@ try:
 except:
     print("Gemini API key not configured")
 
-def detect_plant_disease_real(image_path, crop_type, user_language='en'):
+def detect_plant_disease_real(image_path, crop_type, user_language ='hi'):
+    """Unified detection pipeline → Plant.id → Fallback → Error handling."""
+    result = None
+    try:
+        result = detect_with_plantid(image_path, crop_type, user_language)
+    except Exception as e:
+        logger.error(f"Plant.id detection failed: {e}")
+
+    # Fallback if Plant.id failed
+    if not result:
+        try:
+            result = intelligent_fallback_detection(image_path, crop_type)
+        except Exception as e:
+            logger.error(f"Fallback detection failed: {e}")
+            result = {"disease": "Error", "confidence": 0, "advice": "Try uploading a clearer image."}
+
+    # Translate result
+    return translate_detection_result(result, user_language)
+
+
+
+def detect_with_plantid(image_path, crop_type=None, user_language='hi'):
     """
-    REAL working disease detection using multiple methods
+    Detect plant diseases using Plant.id v3 Health Assessment API.
+    Docs: https://documenter.getpostman.com/view/24599534/2s93z5A4v2
     """
-    print(f"Starting disease detection for {crop_type} image: {image_path}")
-    
-    try:
-        # Method 1: Try Gemini Vision API first
-        # result = detect_with_gemini_vision(image_path, crop_type)
-        # if result and result.get('success'):
-        #     print("Gemini detection successful")
-        #     return translate_detection_result(result, user_language)
+    PLANT_ID_API_KEY = getattr(settings, "PLANTID_API_KEY", None)
+    lang = 'english'
+    if user_language == 'hi':
+        lang = 'hindi'
+    elif user_language == 'ta':
+        lang = 'tamil'
+    elif user_language == 'te':
+        lang = 'telgu'
+    else:
+        lang = 'english'
         
-        # print("Gemini failed, trying PlantNet API...")
-        
-        # # Method 2: Try PlantNet API
-        # result = detect_with_plantnet(image_path, crop_type)
-        # if result and result.get('success'):
-        #     print("PlantNet detection successful")
-        #     return translate_detection_result(result, user_language)
-        
-        # print("PlantNet failed, trying PlantID API...")
-        
-        # Method 3: Try Plant.id API
-        result = detect_with_plantid(image_path, crop_type)
-        if result and result.get('success'):
-            print("Plant.id detection successful")
-            return translate_detection_result(result, user_language)
-        
-        print("All APIs failed, using intelligent fallback...")
-        
-        # Method 4: Intelligent image analysis + database lookup
-        result = intelligent_fallback_detection(image_path, crop_type)
-        return translate_detection_result(result, user_language)
-        
-    except Exception as e:
-        print(f"Disease detection error: {e}")
-        return create_error_response(str(e), crop_type, user_language)
 
-def detect_with_gemini_vision(image_path, crop_type):
-    """Method 1: Gemini Vision AI Detection"""
-    try:
-        # Load and process image
-        with open(image_path, 'rb') as image_file:
-            image_data = image_file.read()
-        
-        # Resize image if too large
-        image = Image.open(io.BytesIO(image_data))
-        if image.size[0] > 1024 or image.size[1] > 1024:
-            image.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
-            img_byte_arr = io.BytesIO()
-            image.save(img_byte_arr, format='JPEG', quality=85)
-            image_data = img_byte_arr.getvalue()
-        
-        # Create detailed prompt for disease detection
-        prompt = f"""
-        You are an expert plant pathologist. Analyze this {crop_type} plant image for diseases.
-        
-        Please examine the image carefully and provide:
-        1. Is the plant healthy or diseased?
-        2. If diseased, what specific disease(s) do you see?
-        3. Confidence level (0-100%)
-        4. Visible symptoms you observe
-        5. Severity level (low/medium/high)
-        6. Treatment recommendations
-        7. Prevention measures
-        
-        Look for common {crop_type} diseases like:
-        - Blight (early/late)
-        - Leaf spot diseases
-        - Bacterial infections  
-        - Fungal diseases
-        - Viral diseases
-        - Nutrient deficiencies
-        - Pest damage
-        
-        Respond in this exact JSON format:
-        {{
-            "success": true,
-            "is_healthy": boolean,
-            "disease_detected": "disease name or null",
-            "confidence_score": number (0-100),
-            "symptoms": ["symptom1", "symptom2"],
-            "severity": "low/medium/high",
-            "treatment": "detailed treatment recommendations",
-            "prevention": "prevention measures",
-            "additional_notes": "other observations"
-        }}
-        """
-        
-        # Initialize Gemini model
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # Create the request
-        response = model.generate_content([
-            prompt,
-            {
-                "mime_type": "image/jpeg",
-                "data": base64.b64encode(image_data).decode('utf-8')
-            }
-        ])
-        
-        # Parse response
-        response_text = response.text.strip()
-        if response_text.startswith('```json'):
-            response_text = response_text.replace('```json', '').replace('```', '').strip()
-        
-        result = json.loads(response_text)
-        result['method'] = 'gemini_vision'
-        result['crop_type'] = crop_type
-        
-        return result
-        
-    except Exception as e:
-        print(f"Gemini vision error: {e}")
-        return {'success': False, 'error': str(e)}
+    if not PLANT_ID_API_KEY:
+        raise ValueError("Plant.id API key not configured in settings.")
 
-def detect_with_plantnet(image_path, crop_type):
-    """Method 2: PlantNet API Detection"""
     try:
-        # PlantNet API endpoint
-        api_url = "https://my-api.plantnet.org/v2/identify"
-        
-        # Read image file
-        with open(image_path, 'rb') as image_file:
-            files = {
-                'images': image_file,
-                'organs': (None, 'leaf'),
-                'modifiers': (None, 'crop'),
-                'plant-set': (None, 'crop'),
-                'api-key': (None, settings.PLANTNET_API_KEY if hasattr(settings, 'PLANTNET_API_KEY') else 'demo')
-            }
-            
-            response = requests.post(api_url, files=files, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if data.get('results') and len(data['results']) > 0:
-                    best_match = data['results'][0]
-                    confidence = best_match.get('score', 0) * 100
-                    
-                    plant_name = best_match.get('species', {}).get('scientificNameWithoutAuthor', 'Unknown')
-                    
-                    # Analyze for disease based on confidence and plant health
-                    is_healthy = confidence > 80
-                    disease = None if is_healthy else "Possible disease or stress detected"
-                    
-                    return {
-                        'success': True,
-                        'is_healthy': is_healthy,
-                        'disease_detected': disease,
-                        'confidence_score': confidence,
-                        'symptoms': ['Low plant identification confidence'] if not is_healthy else [],
-                        'severity': 'medium' if not is_healthy else 'none',
-                        'treatment': get_treatment_recommendation(crop_type, disease),
-                        'prevention': get_prevention_advice(crop_type),
-                        'method': 'plantnet',
-                        'crop_type': crop_type,
-                        'identified_plant': plant_name
-                    }
-        
-        return {'success': False, 'error': 'PlantNet API failed'}
-        
-    except Exception as e:
-        print(f"PlantNet error: {e}")
-        return {'success': False, 'error': str(e)}
+        with open(image_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+            image_base64 = f"data:image/jpeg;base64,{image_data}"
 
-def detect_with_plantid(image_path, crop_type):
-    """Method 3: Plant.id API Detection"""
-    try:
-        # Plant.id API endpoint
-        api_url = "https://api.plant.id/v3/identify"
-        
-        # Read and encode image
-        with open(image_path, 'rb') as image_file:
-            image_data = base64.b64encode(image_file.read()).decode('utf-8')
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'Api-Key': getattr(settings, 'PLANTID_API_KEY', 'ExkdLI0atCRSKq553s2H5kfLSgw5gMyZiwRddJoEQK73NMUga3')
-        }
-        
         payload = {
-            "images": [image_data],
-            "modifiers": ["crops_fast", "similar_images", "health_only"],
-            "plant_language": "en",
-            "plant_details": ["common_names"]
+            "images": [image_base64],
+            "similar_images": True,
+            "latitude": 49.207,   # optional, you can pass real GPS if available
+            "longitude": 16.608,  # optional
+            "health": "only"
         }
-        
-        response = requests.post(api_url, json=payload, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Check health assessment
-            health_assessment = data.get('health_assessment')
-            if health_assessment:
-                is_healthy = health_assessment.get('is_healthy', {}).get('binary', True)
-                diseases = health_assessment.get('diseases', [])
-                
-                disease_name = None
-                confidence = 50
-                
-                if diseases and len(diseases) > 0:
-                    top_disease = diseases[0]
-                    disease_name = top_disease.get('name', 'Unknown disease')
-                    confidence = top_disease.get('probability', 0) * 100
-                
+
+        response = requests.post(
+            "https://plant.id/api/v3/health_assessment",
+            headers={
+                "Api-Key": PLANT_ID_API_KEY,
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=30
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        # ✅ Parsing based on docs example
+        if "result" in data:
+            result = data["result"]
+
+            if result.get("is_healthy", {}).get("binary") is True:
                 return {
                     'success': True,
-                    'is_healthy': is_healthy,
-                    'disease_detected': disease_name,
-                    'confidence_score': confidence,
-                    'symptoms': [disease_name] if disease_name else [],
-                    'severity': 'medium' if disease_name else 'none',
-                    'treatment': get_treatment_recommendation(crop_type, disease_name),
-                    'prevention': get_prevention_advice(crop_type),
-                    'method': 'plantid',
-                    'crop_type': crop_type
+                    "disease_detected": "Healthy",
+                    "confidence_score": (result.get("is_healthy", {}).get("probability", 1.0))*100,
+                    "treatment": "Plant appears healthy.",
+                    "crop_type" : crop_type,
+                    "method": "plantid"
                 }
-        
-        return {'success': False, 'error': 'Plant.id API failed'}
-        
-    except Exception as e:
-        print(f"Plant.id error: {e}")
-        return {'success': False, 'error': str(e)}
 
+            # If not healthy → check disease suggestions
+            suggestions = result.get("disease", {}).get("suggestions", [])
+            if suggestions:
+                best = suggestions[0]  # Take top suggestion
+                return {
+                    "treatment": get_short_treatment_with_gemini(crop_type, best.get("name", "Unknown"), lang),
+                    'success': True,
+                    'is_healthy': False,
+                    "disease_detected": best.get("name", "Unknown"),
+                    "confidence_score": best.get("probability", 0)*100,
+                    "crop_type": crop_type,
+                    "method": "plantid"
+                }
+
+        return {"disease": "Unknown", "confidence": 0, "advice": "Unable to detect disease."}
+
+    except Exception as e:
+        logger.error(f"Plant.id API error: {e}")
+        return None
+    
 def intelligent_fallback_detection(image_path, crop_type):
     """Method 4: Intelligent image analysis + database matching"""
     try:
@@ -1038,39 +831,22 @@ def get_prevention_advice(crop_type):
     
     return advice.get(crop_type.lower(), f"For {crop_type}: Maintain good agricultural practices, proper spacing, adequate drainage, and regular field monitoring.")
 
-def translate_detection_result(result, target_language):
-    """Translate disease detection results to target language"""
-    if target_language == 'en' or not result.get('success'):
-        return result
-    
+def translate_detection_result(result, target_lang="en"):
+    """Translate disease detection result into target language."""
+    translator = Translator()
     try:
-        translator = Translator()
-        
-        # Translate treatment and prevention
-        if result.get('treatment'):
-            translated_treatment = translator.translate(result['treatment'], dest=target_language)
-            result['treatment_translated'] = translated_treatment.text
-        
-        if result.get('prevention'):
-            translated_prevention = translator.translate(result['prevention'], dest=target_language)
-            result['prevention_translated'] = translated_prevention.text
-        
-        # Translate symptoms
-        if result.get('symptoms'):
-            translated_symptoms = []
-            for symptom in result['symptoms']:
-                try:
-                    translated_symptom = translator.translate(symptom, dest=target_language)
-                    translated_symptoms.append(translated_symptom.text)
-                except:
-                    translated_symptoms.append(symptom)  # Keep original if translation fails
-            result['symptoms_translated'] = translated_symptoms
-        
+        # Direct translation (googletrans is sync, no need asyncio)
+        if "disease" in result:
+            result["disease"] = translator.translate(result["disease"], dest=target_lang).text
+        if "advice" in result:
+            result["advice"] = translator.translate(result["advice"], dest=target_lang).text
+        if "confidence" in result:
+            # Keep confidence numeric
+            result["confidence"] = result["confidence"]
         return result
-        
     except Exception as e:
-        print(f"Translation error: {e}")
-        return result
+        logger.error(f"Translation error: {e}")
+        return result  # Fallback: return untranslated
 
 def create_error_response(error_message, crop_type, user_language):
     """Create error response when all methods fail"""
@@ -1103,360 +879,35 @@ def create_error_response(error_message, crop_type, user_language):
         'crop_type': crop_type
     }
 
-# Update the main detection function in views to use the real detection
-def analyze_crop_with_gemini(image_path, crop_type, user_language='en'):
-    """Main function called from views - now uses real detection"""
-    return detect_plant_disease_real(image_path, crop_type, user_language)
+def analyze_crop_with_gemini(image_path, target_lang="en"):
+    """
+    Main function that integrates Plant.id + fallback + translation.
+    (Name kept for compatibility with your app).
+    """
+    return detect_plant_disease_real(image_path, target_lang)
 
 
 
+def get_short_treatment_with_gemini(crop_name: str, disease_name: str, lang : str) -> str:
+    """
+    Gemini ko query karke 2 line ka treatment advice return karta hai.
+    Input: crop name, disease name
+    Output: 2-3 line treatment string
+    """
+    prompt = f"""
+    You are an agricultural expert.
+    A farmer has a {crop_name} crop affected by {disease_name}.
+
+    1. Give clear and practical treatment advice in 2–3 short lines only.
+    2. If the disease is serious, then at the end add this exact line in {lang}:
+    "मेरी सबसे अच्छी सलाह है कि आप AgriFish से स्प्रे सेवा बुक करें, 'Book Treatment' बटन पर क्लिक करके।"
+    3. Write the entire response in {lang} language.
+    Keep the tone simple, farmer-friendly, and easy to follow.
+    """
+
+    model = genai.GenerativeModel("gemini-1.5-flash")  # ya "gemini-1.5-pro" agar chahte ho
+    response = model.generate_content(prompt)
+
+    return response.text.strip()
 
 
-
-
-# import requests
-# import json
-# import math
-# import os
-# from django.conf import settings
-# from django.core.files.storage import default_storage
-# from googletrans import Translator
-# from gtts import gTTS
-# import tempfile
-# from datetime import datetime
-# from .models import WorkerProfile
-
-# def detect_plant_disease(image_path, crop_type):
-#     """
-#     Detect plant disease using AI API or mock response for demo
-#     In production, integrate with actual plant disease detection API
-#     """
-#     try:
-#         # Mock response for demo - replace with actual API call
-#         mock_diseases = {
-#             'tomato': {
-#                 'diseases': ['Early Blight', 'Late Blight', 'Leaf Mold', 'Bacterial Spot', 'Healthy'],
-#                 'suggestions': {
-#                     'Early Blight': 'Apply fungicide containing chlorothalonil or copper. Ensure proper spacing for air circulation. Remove affected leaves.',
-#                     'Late Blight': 'Use fungicides with metalaxyl or cymoxanil. Avoid overhead watering. Destroy infected plants.',
-#                     'Leaf Mold': 'Improve ventilation, reduce humidity. Apply fungicides with chlorothalonil.',
-#                     'Bacterial Spot': 'Use copper-based bactericides. Avoid overhead irrigation. Use resistant varieties.',
-#                     'Healthy': 'Your crop looks healthy! Continue regular care and monitoring.'
-#                 }
-#             },
-#             'potato': {
-#                 'diseases': ['Early Blight', 'Late Blight', 'Common Scab', 'Healthy'],
-#                 'suggestions': {
-#                     'Early Blight': 'Apply preventive fungicide sprays. Ensure adequate plant spacing.',
-#                     'Late Blight': 'Use systemic fungicides. Monitor weather conditions for disease pressure.',
-#                     'Common Scab': 'Maintain soil pH between 5.0-5.2. Avoid over-liming.',
-#                     'Healthy': 'Maintain current care practices. Monitor for any changes.'
-#                 }
-#             }
-#         }
-        
-#         # Simulate disease detection (replace with actual API logic)
-#         import random
-#         crop_data = mock_diseases.get(crop_type, mock_diseases['tomato'])
-#         detected_disease = random.choice(crop_data['diseases'])
-#         confidence = random.uniform(0.75, 0.95) if detected_disease != 'Healthy' else random.uniform(0.85, 0.98)
-        
-#         return {
-#             'disease': detected_disease,
-#             'confidence': confidence,
-#             'status': 'diseased' if detected_disease != 'Healthy' else 'healthy',
-#             'suggestions': crop_data['suggestions'][detected_disease]
-#         }
-    
-#     except Exception as e:
-#         print(f"Error in disease detection: {e}")
-#         return {
-#             'disease': 'Unknown',
-#             'confidence': 0.0,
-#             'status': 'unknown',
-#             'suggestions': 'Unable to analyze the image. Please try again with a clearer image.'
-#         }
-
-# def translate_text(text, target_language='hi'):
-#     """
-#     Translate text to multiple languages using Google Translate
-#     """
-#     try:
-#         translator = Translator()
-        
-#         # Languages to translate to
-#         languages = {
-#             'en': 'English',
-#             'hi': 'Hindi',
-#             'te': 'Telugu',
-#             'ta': 'Tamil'
-#         }
-        
-#         translations = {}
-#         for lang_code in languages:
-#             if lang_code == 'en':
-#                 translations[lang_code] = text
-#             else:
-#                 try:
-#                     translated = translator.translate(text, dest=lang_code)
-#                     translations[lang_code] = translated.text
-#                 except:
-#                     translations[lang_code] = text  # Fallback to original text
-        
-#         return translations
-    
-#     except Exception as e:
-#         print(f"Translation error: {e}")
-#         return {'en': text, 'hi': text, 'te': text, 'ta': text}
-
-# def generate_speech(text, language='en'):
-#     """
-#     Generate text-to-speech audio file
-#     """
-#     try:
-#         # Map language codes for gTTS
-#         lang_mapping = {
-#             'en': 'en',
-#             'hi': 'hi',
-#             'te': 'te',
-#             'ta': 'ta'
-#         }
-        
-#         gtts_lang = lang_mapping.get(language, 'en')
-#         tts = gTTS(text=text, lang=gtts_lang, slow=False)
-        
-#         # Create temporary file
-#         temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_audio')
-#         os.makedirs(temp_dir, exist_ok=True)
-        
-#         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-#         filename = f'speech_{timestamp}.mp3'
-#         file_path = os.path.join(temp_dir, filename)
-        
-#         tts.save(file_path)
-        
-#         return settings.MEDIA_URL + f'temp_audio/{filename}'
-    
-#     except Exception as e:
-#         print(f"TTS error: {e}")
-#         return None
-
-# def calculate_distance(lat1, lon1, lat2, lon2):
-#     """
-#     Calculate distance between two points using Haversine formula
-#     Returns distance in kilometers
-#     """
-#     try:
-#         R = 6371  # Earth's radius in kilometers
-        
-#         lat1_rad = math.radians(lat1)
-#         lat2_rad = math.radians(lat2)
-#         delta_lat = math.radians(lat2 - lat1)
-#         delta_lon = math.radians(lon2 - lon1)
-        
-#         a = (math.sin(delta_lat / 2) * math.sin(delta_lat / 2) +
-#              math.cos(lat1_rad) * math.cos(lat2_rad) *
-#              math.sin(delta_lon / 2) * math.sin(delta_lon / 2))
-        
-#         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-#         distance = R * c
-        
-#         return round(distance, 2)
-    
-#     except:
-#         return 0
-
-# def get_nearby_workers(latitude, longitude, radius_km=20):
-#     """
-#     Get available workers within specified radius
-#     """
-#     try:
-#         workers = WorkerProfile.objects.filter(
-#             is_available=True,
-#             user_profile__latitude__isnull=False,
-#             user_profile__longitude__isnull=False
-#         )
-        
-#         nearby_workers = []
-#         for worker in workers:
-#             distance = calculate_distance(
-#                 latitude, longitude,
-#                 worker.user_profile.latitude,
-#                 worker.user_profile.longitude
-#             )
-            
-#             if distance <= radius_km:
-#                 nearby_workers.append(worker)
-        
-#         # Sort by distance and rating
-#         nearby_workers.sort(key=lambda w: (
-#             calculate_distance(latitude, longitude, w.user_profile.latitude, w.user_profile.longitude),
-#             -w.rating
-#         ))
-        
-#         return nearby_workers
-    
-#     except Exception as e:
-#         print(f"Error finding nearby workers: {e}")
-#         return []
-
-# def calculate_service_cost(area_acres, crop_type, disease_type=None):
-#     """
-#     Calculate estimated cost for spray service
-#     """
-#     try:
-#         # Base rates per acre
-#         base_rates = {
-#             'tomato': 500,
-#             'potato': 450,
-#             'corn': 400,
-#             'wheat': 350,
-#             'rice': 400,
-#             'cotton': 450,
-#             'soybean': 400,
-#             'apple': 550,
-#             'grape': 600,
-#             'other': 400
-#         }
-        
-#         base_rate = base_rates.get(crop_type, 400)
-        
-#         # Disease complexity multiplier
-#         disease_multiplier = 1.0
-#         if disease_type and disease_type != 'Healthy':
-#             complex_diseases = ['Late Blight', 'Bacterial Spot', 'Common Scab']
-#             if disease_type in complex_diseases:
-#                 disease_multiplier = 1.3
-#             else:
-#                 disease_multiplier = 1.1
-        
-#         # Area-based pricing (economies of scale)
-#         if area_acres > 5:
-#             area_multiplier = 0.9
-#         elif area_acres > 10:
-#             area_multiplier = 0.8
-#         else:
-#             area_multiplier = 1.0
-        
-#         total_cost = base_rate * area_acres * disease_multiplier * area_multiplier
-        
-#         return round(total_cost, 2)
-    
-#     except:
-#         return 500.0  # Default cost
-
-# def send_notification_to_nearby_workers(booking):
-#     """
-#     Send notification to nearby available workers about new booking
-#     """
-#     try:
-#         nearby_workers = get_nearby_workers(
-#             booking.farm_latitude,
-#             booking.farm_longitude,
-#             radius_km=30
-#         )
-        
-#         from .models import Notification
-        
-#         for worker in nearby_workers[:5]:  # Notify top 5 workers
-#             Notification.objects.create(
-#                 user=worker.user_profile,
-#                 title='New Service Request',
-#                 message=f'New {booking.service_type} request for {booking.area_acres} acres in your area.',
-#                 notification_type='booking_created',
-#                 related_booking=booking
-#             )
-        
-#         return len(nearby_workers)
-    
-#     except Exception as e:
-#         print(f"Error sending notifications: {e}")
-#         return 0
-
-# def validate_coordinates(latitude, longitude):
-#     """
-#     Validate GPS coordinates
-#     """
-#     try:
-#         lat = float(latitude)
-#         lng = float(longitude)
-        
-#         # Check if coordinates are within valid ranges
-#         if -90 <= lat <= 90 and -180 <= lng <= 180:
-#             # Check if coordinates are not (0, 0) which is likely invalid
-#             if lat != 0 or lng != 0:
-#                 return True
-        
-#         return False
-#     except:
-#         return False
-
-# def format_currency(amount):
-#     """
-#     Format amount as Indian currency
-#     """
-#     try:
-#         # Convert to float if string
-#         if isinstance(amount, str):
-#             amount = float(amount)
-        
-#         # Format with commas for Indian numbering system
-#         formatted = f"₹{amount:,.2f}"
-#         return formatted
-#     except:
-#         return f"₹{amount}"
-
-# def get_disease_severity_color(confidence_score):
-#     """
-#     Get color code based on disease detection confidence
-#     """
-#     if confidence_score >= 0.9:
-#         return 'danger'  # High confidence - serious disease
-#     elif confidence_score >= 0.7:
-#         return 'warning'  # Medium confidence - moderate concern
-#     elif confidence_score >= 0.5:
-#         return 'info'  # Low confidence - monitor
-#     else:
-#         return 'success'  # Very low confidence - likely healthy
-
-# def clean_old_temp_files():
-#     """
-#     Clean up old temporary audio files
-#     """
-#     try:
-#         temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_audio')
-#         if os.path.exists(temp_dir):
-#             for filename in os.listdir(temp_dir):
-#                 file_path = os.path.join(temp_dir, filename)
-#                 # Delete files older than 1 hour
-#                 if os.path.getctime(file_path) < (datetime.now().timestamp() - 3600):
-#                     os.remove(file_path)
-#     except Exception as e:
-#         print(f"Error cleaning temp files: {e}")
-
-# def get_weather_info(latitude, longitude):
-#     """
-#     Get basic weather information for spray timing recommendations
-#     Mock implementation - integrate with weather API in production
-#     """
-#     try:
-#         # Mock weather data
-#         import random
-#         weather_conditions = ['Clear', 'Partly Cloudy', 'Cloudy', 'Light Rain', 'Heavy Rain']
-#         wind_speeds = [2, 5, 8, 12, 15, 20]  # km/h
-        
-#         return {
-#             'condition': random.choice(weather_conditions),
-#             'wind_speed': random.choice(wind_speeds),
-#             'temperature': random.randint(20, 35),
-#             'humidity': random.randint(40, 90),
-#             'spray_suitable': random.choice([True, False])
-#         }
-#     except:
-#         return {
-#             'condition': 'Unknown',
-#             'wind_speed': 0,
-#             'temperature': 25,
-#             'humidity': 60,
-#             'spray_suitable': True
-#         }

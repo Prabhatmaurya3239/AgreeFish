@@ -141,7 +141,6 @@ def worker_dashboard(request):
     pending_bookings = ServiceBooking.objects.filter(
         worker=None,
         status='pending',
-        payment_status='paid'
     ).order_by('-created_at')[:10]
     
     # Filter by location if worker has coordinates
@@ -467,7 +466,8 @@ def booking_payment(request, booking_id):
             # Create Razorpay order
             client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
             
-            amount = int(booking.estimated_cost * 100)  # Convert to paise
+            amount = int(booking.estimated_cost * 100)
+            print(amount) # Convert to paise
             order_data = {
                 'amount': amount,
                 'currency': 'INR',
@@ -761,11 +761,12 @@ def language_switch(request):
 @require_POST
 def submit_review_api(request):
     """API endpoint to submit worker review"""
+    print("API called")
     try:
         booking_id = request.POST.get('booking_id')
         rating = int(request.POST.get('rating'))
         comment = request.POST.get('comment', '')
-        
+        print("Hello")
         booking = get_object_or_404(ServiceBooking, 
                                    id=booking_id, 
                                    farmer=request.user.userprofile,
@@ -799,6 +800,7 @@ def submit_review_api(request):
         })
         
     except Exception as e:
+        print(f"Error submitting review: {e}")
         return JsonResponse({'success': False, 'error': str(e)})
 
 

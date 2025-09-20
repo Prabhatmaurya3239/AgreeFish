@@ -97,6 +97,8 @@ RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='your-razorpay-secre
 PLANTNET_API_KEY = config('PLANTNET_API_KEY', default='your-plantnet-api-key')
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='your-gemini-api-key')
 OPENWEATHER_API_KEY = config('OPENWEATHER_API_KEY', default='your-weather-api-key')
+PLANTID_API_KEY = config('PLANTID_API_KEY', default='your-plantid-api-key')
+
 
 
 # Internationalization

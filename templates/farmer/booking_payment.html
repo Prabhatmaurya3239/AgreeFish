@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
             alert("Initiating Razorpay payment...");
             const options = {
                 "key": "{{ razorpay_key_id }}",
-                "amount": {{ booking.estimated_cost }},
+                "amount": {{ booking.estimated_cost }}*100,
                 "currency": "INR",
                 "name": "AgriFish",
                 "description": "{{ booking.service_type }} - {{ booking.crop_type }}",

@@ -124,6 +124,11 @@
             
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                                <a class="nav-link" href=" http://172.28.29.134:1020/">
+                                    <i class="fas fa-tachometer-alt me-1"></i> Crop care
+                                </a>
+                            </li>
                     {% if user.is_authenticated %}
                         {% if user.userprofile.user_type == 'farmer' %}
                             <li class="nav-item">
@@ -219,7 +224,7 @@
                     <ul class="list-unstyled">
                         <li><a href="#" class="text-white-50">About Us</a></li>
                         <li><a href="#" class="text-white-50">Contact</a></li>
-                        <li><a href="#" class="text-white-50">Support</a></li>
+                        <li><a href="{% url 'chat_interface' %}" class="text-white-50">Support</a></li>
                     </ul>
                 </div>
             </div>

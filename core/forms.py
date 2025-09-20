@@ -106,6 +106,7 @@ class DiseaseDetectionForm(forms.ModelForm):
         ('soybean', 'Soybean'),
         ('apple', 'Apple'),
         ('grape', 'Grape'),
+        ('fiber', 'Fiber'),
         ('other', 'Other'),
     ]
     
